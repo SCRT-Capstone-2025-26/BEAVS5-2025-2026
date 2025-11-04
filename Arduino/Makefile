@@ -37,7 +37,7 @@ $(TARGET_BIND): $(OBJECTS) board.o
 	fi
 
 board.h board.cpp: BEAVS5_Main.ino additions.txt
-	python3 classify.py BEAVS5_Main.ino additions.txt board Board
+	python3 classify.py Firmware/BEAVS5_Main.ino additions.txt board Board
 
 -include $(DEPS)
 

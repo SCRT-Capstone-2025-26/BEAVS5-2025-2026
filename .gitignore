@@ -1,12 +1,12 @@
 /.vscode
-BEAVS5_Main/*.o
-BEAVS5_Main/*.d
-BEAVS5_Main/.cache
-BEAVS5_Main/sim.so
-BEAVS5_Main/.buildflags.txt
-BEAVS5_Main/.deps
-BEAVS5_Main/board.cpp
-BEAVS5_Main/board.h
+Arduino/*.o
+Arduino/*.d
+Arduino/.cache
+Arduino/sim.so
+Arduino/.buildflags.txt
+Arduino/.deps
+Arduino/board.cpp
+Arduino/board.h
 
 pyrightconfig.json
 compile_commands.json
