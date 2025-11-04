@@ -8,14 +8,14 @@ Servo: DS3235
 */
 
 // -----   Libraries   -----
-#include <Wire.h>
+#include "InterpolationLib.h"
+#include <Adafruit_BMP3XX.h>
+#include <Adafruit_BNO055.h>
+#include <Adafruit_Sensor.h>
 #include <SPI.h>
 #include <SdFat.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BMP3XX.h"
-#include <Adafruit_BNO055.h>
+#include <Wire.h>
 #include <utility/imumaths.h>
-#include "InterpolationLib.h"
 
 
 // Utility
@@ -167,8 +167,8 @@ long datacoll_timer = 0;                // [ms]
 //float datacoll_extension = 12.5;        // [%]
 
 int extension_index=0;                       // [#]
-float extensions[]={.3,.5,.9};    // [%]
-float waits[]={2,2,2,2,2,2};      // [s]
+float extensions[3]={.3,.5,.9};    // [%]
+float waits[6]={2,2,2,2,2,2};      // [s]
 //t=0 u=0,t=0.5 u=.3, dt=3  
 
 float interupt_time=0;
@@ -311,30 +311,6 @@ void loop() {
 
 // Core 2
 void loop1() {
-  switch(flight_phase) {
-    case PREFLIGHT:
-      preflight_loop(2);
-      break;
-    case DISARMED:
-      disarmed_loop(2);
-      break;
-    case ARMED:
-      ready_loop(2);
-      break;
-    case FLIGHT:
-      flight_loop(2);
-      break;
-    case OVERSHOOT:
-      overshoot_loop(2);
-      break;
-    case COAST:
-      coast_loop(2);
-      break;
-    case DESCENT:
-      descend_loop(2);
-      break;
-  }
-
   delay(5);
 }
 
@@ -355,7 +331,10 @@ void preflight_loop(int core) {
     // TODO: disable telemetry write on ground for final flight
     //write_telemetry();
   } else if (core == 2) {
-    preflight();
+    // This seems to be a bug so I commented it out
+    // As it sets the flight state to preflight
+    // If this runs at a weird time the rocket could stay in preflight
+    // preflight();
   }
 }
 
@@ -1174,7 +1153,7 @@ float get_air_density(float altitude) { // [meters]
 
   // pain
   for (int i = 0; i < poly_order + 1; i++) {
-    result = result + ((double) pow(time, poly_order - i) * consts[i]);
+    result = result + ((double) pow(altitude, poly_order - i) * consts[i]);
   }
 
   return (float) result;
