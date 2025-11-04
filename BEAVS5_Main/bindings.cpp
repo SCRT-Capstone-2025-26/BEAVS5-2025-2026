@@ -1,17 +1,32 @@
 #include <cassert>
+#include <optional>
 #include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl.h>
 
 #include "bmp.h"
 #include "bno.h"
 #include "board.h"
 #include "misc.h"
-#include "pybind11/pytypes.h"
+#include "sdfat.h"
 #include "sim.h"
 
 PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
   pybind11::class_<HardwareSerial_s>(mod, "Serial")
       .def("contents", [](const HardwareSerial_s &serial) {
         return pybind11::bytes(serial.data_s.str());
+      });
+
+  pybind11::class_<SdFs>(mod, "SDFS")
+      .def("get_file", [](const SdFs &fs, const std::string &path_str) {
+        std::filesystem::path path(path_str.c_str());
+
+        if (!fs.files_s.contains(path)) {
+          return std::optional<pybind11::bytes>();
+        }
+
+        return std::optional(
+            pybind11::bytes(fs.files_s.at(path)->content.str()));
       });
 
   // C++ pointer to member syntax is lacking
@@ -49,6 +64,7 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
 
   pybind11::class_<Board>(mod, "Board")
       .def_readonly("serial", &Board::Serial)
+      .def_readonly("SD", &Board::SD)
       .def_readonly("bno", &Board::bno)
       .def_readonly("bmp", &Board::bmp)
       .def_readonly("interrupt_pin", &Board::interrupt_pin);
@@ -65,6 +81,13 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
              assert(sim.pins_s[pin].mode == INPUT);
 
              sim.pins_s[pin].value = value;
+           })
+      .def("get_pin",
+           [](Sim_s &sim, uint8_t pin) {
+             assert(pin < pin_count_s);
+             assert(sim.pins_s[pin].mode == OUTPUT);
+
+             return sim.pins_s[pin].value;
            })
       .def_readonly("micros", &Sim_s::micros_s)
       .def_readonly("board", &Sim_s::board_s);

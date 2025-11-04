@@ -43,12 +43,12 @@ struct File_s {
 // Less restrictive than normal FAT file
 class FsFile {
 private:
-  FsFile(std::shared_ptr<File_s> file) : file(file) {}
-
-  std::shared_ptr<File_s> file;
+  FsFile(std::shared_ptr<File_s> file) : file_s(file) {}
 
 public:
-  FsFile() : file(nullptr) {}
+  std::shared_ptr<File_s> file_s;
+
+  FsFile() : file_s(nullptr) {}
 
   size_t println(const String &str);
   bool close();
@@ -61,13 +61,14 @@ class SdFs {
 private:
   bool began = false;
 
-  std::unordered_map<std::filesystem::path, std::shared_ptr<File_s>> files;
   std::unordered_set<std::filesystem::path> dirs;
 
   bool mkdir(const std::filesystem::path &path, bool pFlag);
   bool exists(const std::filesystem::path &path) const;
 
 public:
+  std::unordered_map<std::filesystem::path, std::shared_ptr<File_s>> files_s;
+
   bool begin(SdSpiConfig spiConfig);
 
   bool mkdir(const String &path, bool pFlag = true);

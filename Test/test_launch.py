@@ -20,3 +20,6 @@ def test_up():
     ]
 
     print([line.altitude for line in parsed if isinstance(line, lp.SerialTelemetry)])
+
+    content = s.board.SD.get_file("Logs/log_0.txt")
+    print(content)

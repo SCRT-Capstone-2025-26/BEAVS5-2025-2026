@@ -36,6 +36,7 @@ $(TARGET_BIND): $(OBJECTS) board.o
 		rm .buildflags.txt.tmp; \
 	fi
 
+# TODO:Find a better way to do this because this is really stupid
 board.h board.cpp: BEAVS5_Main.ino additions.txt
 	python3 classify.py BEAVS5_Main.ino additions.txt board Board
 
