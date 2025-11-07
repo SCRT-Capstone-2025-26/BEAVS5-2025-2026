@@ -117,6 +117,8 @@ const int LED_pin_RDY_FLY = 3;
 
 const int ARMING_pin = 21;
 
+const unsigned long COAST_TIME = 60 * 3 * 1000;
+
 
 #define SPI_CLOCK SD_SCK_MHZ(50)
 #define SD_CONFIG SdSpiConfig(SD_pin_CS, DEDICATED_SPI, SPI_CLOCK)
@@ -171,6 +173,8 @@ long pid_clock_time = 0;      // [ms]
 long launch_timestamp = 0;    // [ms]
 long apogee_timestamp = 0;    // [ms]
 bool log_terminated = false;  // [bool]
+
+unsigned long coast_start_time;
 
 float max_height = 0;       // [meters]
 long max_height_clock = 0;  // [ms]
@@ -462,7 +466,7 @@ void coast_loop(int core) {
     //if (height > target_apogee) overshoot();
 
     // TODO the altitude reading is TOO NOISY for this cutoff: will have to add additional conditions
-    if (max_height > height && (millis() - max_height_clock) > 500) {
+    if (coast_start_time + COAST_TIME < millis()) {
       descend();
     }
   } else if (core == 2) {
@@ -611,6 +615,7 @@ void launch() {
 void coast() {
   // ENGINE CUTOFF: Deploy BEAVS
   flight_phase = COAST;
+  coast_start_time = millis();
 
   log("Coast phase entered, beginning deployment.");
 }
@@ -767,7 +772,7 @@ void collect_telemetry() {
     Serial.print(" ");
     Serial.print(acceleration);
     Serial.print(" ");
-    Serial.println(velocity);
+    Serial.print(velocity);
     Serial.print(" ");
     Serial.println(flight_phase);
 
