@@ -1,5 +1,6 @@
-import sys
+import subprocess as sp
+from contextlib import chdir
+import os
 
-# Will work whether run in root or in Test/
-sys.path.append("../BEAVS5_Main/")
-sys.path.append("./BEAVS5_Main/")
+with chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../Arduino")):
+    sp.run(["make", "exp"])
