@@ -36,8 +36,8 @@ $(TARGET_BIND): $(OBJECTS) board.o
 		rm .buildflags.txt.tmp; \
 	fi
 
-board.h board.cpp: BEAVS5_Main.ino additions.txt
-	python3 classify.py Firmware/BEAVS5_Main.ino additions.txt board Board
+board.h board.cpp: BEAVS5_Main/BEAVS5_Main.ino additions.txt
+	python3 classify.py BEAVS5_Main/BEAVS5_Main.ino additions.txt board Board
 
 -include $(DEPS)
 

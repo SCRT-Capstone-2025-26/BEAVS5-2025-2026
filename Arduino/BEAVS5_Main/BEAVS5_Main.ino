@@ -6,19 +6,28 @@
 #include <SdFat.h>
 #include <Wire.h>
 #include <utility/imumaths.h>
+#include <atomic>
+#include <deque>
 
 // The string addition feels wrong, but it seems right
 // This code will not handle rollovers for millis() (~49.7 days), but will for
 // micros() (~71.5 minutes)
 
+typedef struct {
+  unsigned long time;
+  String message;
+} Event;
+
+typedef unsigned long TimeType;
+
 // This should be more than enough
-const int MAX_EVENTS = 64;
+const size_t MAX_EVENTS = 64;
 
 const uint8_t PIN_SD_CS = 17;
 const SdSpiConfig SD_CONFIG =
     SdSpiConfig(PIN_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(50));
 
-const unsigned long AUX_DELAY_MIL = 100;
+const TimeType AUX_DELAY_MIL = 100;
 
 const uint8_t BMP_ADDR = 0x77;
 
@@ -29,10 +38,10 @@ const uint8_t PIN_SERVO = 28;
 const uint8_t PIN_SERVO_MOSFET = 27;
 const uint8_t PIN_ARM = 29;
 
-const unsigned long BMP_DELAY_MIC = 1000;
-const unsigned long BNO_DELAY_MIC = 1000;
-const unsigned long PID_DELAY_MIC = 1000;
-const unsigned long MISC_DELAY_MIC = 10000;
+const TimeType BMP_DELAY_MIC = 1000;
+const TimeType BNO_DELAY_MIC = 1000;
+const TimeType PID_DELAY_MIC = 1000;
+const TimeType MISC_DELAY_MIC = 10000;
 
 const float PID_DELAY_SEC = (float)PID_DELAY_MIC / 1000.0F / 1000.0F;
 
@@ -48,17 +57,12 @@ const int SERVO_MAX = 0;
 
 const float SEA_PRESSURE = 0;
 
-typedef struct {
-  unsigned long time;
-  String message;
-} Event;
-
 // Shared
 // These could be optimized a bit as a mutex is a bit expensive and could
 // probably be replaced with a circular buffer using atomics. Also AFAIK the
 // atomics cause fences when reading and writing that will slow things down
 std::mutex events_lock;
-std::deque<Event> events(MAX_EVENTS);
+std::deque<Event> events = std::deque<Event>(MAX_EVENTS);
 
 // This code will used explicit references to atomic read and write operations
 std::atomic<int> servo_pwm = 0;
@@ -69,14 +73,14 @@ Adafruit_BMP3XX bmp;
 Adafruit_BNO055 bno = Adafruit_BNO055(55, BNO_ADDR);
 
 enum { BMP, BNO, PID, MISC, TASK_COUNT };
-unsigned long task_timers[TASK_COUNT] = {};
+TimeType task_timers[TASK_COUNT] = {};
 // TASK_COUNT will just be ignored it only does logic on the other enum values
 int task = TASK_COUNT;
 
 enum { PREFLIGHT, ARMING, ARMED, FLYING, DONE };
 int state;
 
-unsigned long curr_state_time;
+TimeType curr_state_time;
 
 float altitude;
 sensors_event_t gyroscope;
@@ -92,7 +96,7 @@ FsFile log_file;
 FsFile data_file;
 
 void log(const Event &event) {
-  String text = "[" + event.time + "] " + event.message;
+  String text = "[" + String(event.time) + "] " + event.message;
   if (!sd_inited) {
     log_file.println(event.message);
   }
@@ -131,25 +135,27 @@ bool pop_event(Event &event) {
 
 // Micros overflows about every 70 minutes, but because unsigneds
 // implement modulo arithmetic it shouldn't matter
-unsigned long get_delay(int &state) {
+TimeType get_delay(int &state) {
   // If there were more tasks a min heap should be used
-  unsigned long time = micros();
-  unsigned long delay = ULONG_LONG_MAX;
+  TimeType time = micros();
+  TimeType value = ULONG_LONG_MAX;
   for (int i = 0; i < TASK_COUNT; i++) {
     // Time has to be subtracted from each to make sure that overflows don't
     // affect the system in weird ways
-    unsigned long curr = task_timers[i] - time;
+    TimeType curr = task_timers[i] - time;
     // This checks if the task_timers[i] is smaller than time (it will not
     // trigger on an overflow though)
     if (curr > ULONG_LONG_MAX / 2) {
       curr = 0;
     }
 
-    if (curr < delay) {
-      delay = curr;
+    if (curr < value) {
+      value = curr;
       state = i;
     }
   }
+
+  return value;
 }
 
 // Maps float to servo extension
@@ -300,7 +306,7 @@ void setup() {
 
   push_event("Pins inited");
 
-  unsigned long time = micros();
+  TimeType time = micros();
   task_timers[0] = time;
   task_timers[1] = time;
   task_timers[2] = time;
@@ -398,7 +404,7 @@ void loop() {
 
 void loop1() {
   if (sd_inited) {
-    String entry = String(millis()) + ',' + 0;
+    String entry = String(millis()) + ',' + servo_pwm.load();
     data_file.println(entry);
   }
 

@@ -6,7 +6,7 @@ import os
 
 def get_function(node, name):
     for child in node.children:
-        if child.type == "primitive_type":
+        if child.type == "primitive_type" or child.type == "type_identifier":
             type_node = child
         elif child.type == "function_declarator":
             decl_node = child
@@ -17,6 +17,17 @@ def get_function(node, name):
     defi = b"%s %s::%s %s" % (type_node.text, name, decl_node.text, stmt_node.text)
 
     return decl, defi
+
+
+def get_declaration(node):
+    children = []
+    for child in node.children:
+        if child.type == "type_qualifier" and child.text == b"const":
+            continue
+
+        children.append(child.text)
+
+    return b" ".join(children)
 
 
 def read_decls(node, name):
@@ -34,7 +45,9 @@ def read_decls(node, name):
             in_class.append(decl)
             source.append(defi)
         elif child.type == "declaration":
-            in_class.append(b"%s" % (child.text))
+            in_class.append(get_declaration(child))
+        elif child.type == "type_definition":
+            out_class.append(b"%s" % (child.text))
         elif child.type == "enum_specifier":
             in_class.append(b"%s;" % (child.text))
         elif child.type == "preproc_def":
