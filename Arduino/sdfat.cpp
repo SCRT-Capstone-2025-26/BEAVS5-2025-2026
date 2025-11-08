@@ -89,7 +89,7 @@ FsFile SdFs::open(const String &path_str, oflag_t oflag) {
   auto index = files_s.find(path);
   if (index == files_s.end()) {
     if (oflag & O_CREAT) {
-      std::shared_ptr<File_s> file;
+      std::shared_ptr<File_s> file = std::make_shared<File_s>();
       files_s.insert({path, file});
       return file;
     } else {

@@ -62,7 +62,7 @@ const float SEA_PRESSURE = 0;
 // probably be replaced with a circular buffer using atomics. Also AFAIK the
 // atomics cause fences when reading and writing that will slow things down
 std::mutex events_lock;
-std::deque<Event> events = std::deque<Event>(MAX_EVENTS);
+std::deque<Event> events = std::deque<Event>();
 
 // This code will used explicit references to atomic read and write operations
 std::atomic<int> servo_pwm = 0;
@@ -90,14 +90,14 @@ float integral_sum;
 float prev_error;
 
 // Core 2
-bool sd_inited = true;
+bool sd_inited = false;
 SdFs sd;
 FsFile log_file;
 FsFile data_file;
 
 void log(const Event &event) {
   String text = "[" + String(event.time) + "] " + event.message;
-  if (!sd_inited) {
+  if (sd_inited) {
     log_file.println(event.message);
   }
 
@@ -321,9 +321,6 @@ void setup1() {
   Serial.begin(115200);
   log("Started serial");
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  log("Init aux pins");
-
   if (sd.begin(SD_CONFIG)) {
     log("SD inited");
 
@@ -343,10 +340,14 @@ void setup1() {
       data_file.println("time,altitude");
 
       log("Files " + String(i) + " created");
+      break;
     }
   } else {
     log("SD init failed");
   }
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  log("Init aux pins");
 
   log("Aux inited");
 }

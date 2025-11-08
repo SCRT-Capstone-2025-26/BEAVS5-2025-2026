@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstdio>
 #include <optional>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
@@ -64,7 +65,7 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
 
   pybind11::class_<Board>(mod, "Board")
       .def_readonly("serial", &Board::Serial)
-      .def_readonly("SD", &Board::sd)
+      .def_readonly("sd", &Board::sd)
       .def_readonly("bno", &Board::bno)
       .def_readonly("bmp", &Board::bmp)
       .def_readonly("PIN_ARM", &Board::PIN_ARM);

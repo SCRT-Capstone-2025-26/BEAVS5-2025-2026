@@ -1,5 +1,3 @@
-from . import log_parse as lp
-
 import beavs_sim as sim
 
 
@@ -15,11 +13,7 @@ def test_up():
         s.step()
 
     content = s.board.serial.contents()
-    parsed = [
-        lp.parse_serial_line(line) for line in content.split(b"\r\n") if len(line) > 0
-    ]
+    print(content)
 
-    print([line.altitude for line in parsed if isinstance(line, lp.SerialTelemetry)])
-
-    content = s.board.SD.get_file("Logs/log_0.txt")
+    content = s.board.sd.get_file("Logs/log_0.txt")
     print(content)

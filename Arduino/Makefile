@@ -1,4 +1,5 @@
 CXX = g++
+# Make fail on warn
 CXXFLAGS = -std=c++20 -Wall -Wextra
 
 TARGET_BIND = beavs_sim$(shell python3-config --extension-suffix)

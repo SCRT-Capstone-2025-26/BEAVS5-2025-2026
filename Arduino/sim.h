@@ -6,7 +6,7 @@
 #include <boost/coroutine2/all.hpp>
 #include <functional>
 
-const int pin_count_s = 29;
+const int pin_count_s = 30;
 
 class Sim_s {
   unsigned long long micros0 = 0;
