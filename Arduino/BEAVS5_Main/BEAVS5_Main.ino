@@ -7,6 +7,7 @@
 #include <utility/imumaths.h>
 #include <atomic>
 #include <deque>
+#include <cmath>
 
 // The string addition feels wrong, but it seems right
 // This code will not handle rollovers for millis() (~49.7 days), but will for
@@ -18,7 +19,7 @@ typedef struct {
 } Event;
 
 // Spinlocks are not very efficient and should be used sparingly on quick operations
-class SpinLock {
+typedef class {
 private:
     std::atomic_flag flag = ATOMIC_FLAG_INIT;
 
@@ -30,7 +31,7 @@ public:
     void unlock() {
         flag.clear(std::memory_order_release);
     }
-};
+} SpinLock;
 
 typedef unsigned long Millis;
 typedef unsigned long Micros;
@@ -42,7 +43,7 @@ const uint8_t PIN_SD_CS = 17;
 const SdSpiConfig SD_CONFIG =
     SdSpiConfig(PIN_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(50));
 
-const Millis AUX_DELAY = 100;
+const Millis AUX_DELAY = 25;
 
 const uint8_t BMP_ADDR = 0x77;
 
@@ -55,29 +56,30 @@ const uint8_t PIN_ARM = 29;
 
 const Micros BMP_DELAY = 1000;
 const Micros BNO_DELAY = 1000;
-const Micros EST_DELAY = 500;
+// Running PID faster than sensors is kinda pointless
+const Micros PID_DELAY = 500;
 const Micros MISC_DELAY = 10000;
 
-const float EST_DELAY_SEC = (float)EST_DELAY / 1000.0F / 1000.0F;
+const float BMP_DELAY_SEC = (float)BMP_DELAY / 1000.0F / 1000.0F;
+const float PID_DELAY_SEC = (float)PID_DELAY / 1000.0F / 1000.0F;
 
-const float P = 0;
+const float P = 0.1;
 const float I = 0;
 const float D = 0;
 
 const float I_MAX = 0;
 
 const int SERVO_RETRACTED = 0;
-const int SERVO_FLUSH = 0;
-const int SERVO_MAX = 0;
+const int SERVO_FLUSH = 50;
+const int SERVO_MAX = 100;
 
 const float SEA_PRESSURE = 0;
 
 const Millis ARM_TIME = 5 * 1000;
 
-const float TARGET_HEIGHT = 10000;
+const float TARGET_HEIGHT = 1000;
 const float G = 9.81;
 const float DRAG = 0.5F;
-const float SERVO_DRAG = 0.1;
 
 // Shared
 // AFAIK the atomics will cause lots of mfences and so could be optimized
@@ -99,15 +101,15 @@ std::atomic<sensors_event_t> sense_acc;
 // Core 1
 bool inited = false;
 Adafruit_BMP3XX bmp;
-Adafruit_BNO055 bno = Adafruit_BNO055(55, BNO_ADDR);
+Adafruit_BNO055 bno = Adafruit_BNO055(55, BNO_ADDR, &Wire);
 
-enum { BMP, BNO, PID, MISC, TASK_COUNT };
+typedef enum { BMP, BNO, PID, MISC, TASK_COUNT } Task;
 Micros task_timers[TASK_COUNT] = {};
 // TASK_COUNT will just be ignored it only does logic on the other enum values
-int task = TASK_COUNT;
+Task task = TASK_COUNT;
 
-enum { PREFLIGHT, ARMING, ARMED, BURN, FLYING, DONE };
-int state;
+typedef enum { PREFLIGHT, ARMING, ARMED, BURN, FLYING, DONE } State;
+State state;
 
 Micros curr_state_time;
 
@@ -120,7 +122,7 @@ SdFs sd;
 FsFile log_file;
 FsFile data_file;
 
-void log(const Event &event) {
+void write_log(const Event &event) {
   String text = "[" + String(event.time) + "] " + event.message;
   if (sd_inited) {
     log_file.println(event.message);
@@ -129,8 +131,8 @@ void log(const Event &event) {
   Serial.println(text);
 }
 
-void log(const String &string) {
-  log((Event){.time = millis(), .message = string});
+void write_log(const String &string) {
+  write_log((Event){.time = millis(), .message = string});
 }
 
 // serial_now should only be true in core2
@@ -164,7 +166,7 @@ bool pop_event(Event &event) {
 
 // Micros overflows about every 70 minutes, but because unsigneds
 // implement modulo arithmetic it shouldn't matter
-Micros get_delay(int &state) {
+Micros get_delay(Task &task) {
   // If there were more tasks a min heap should be used
   Micros time = micros();
   Micros value = ULONG_LONG_MAX;
@@ -180,7 +182,7 @@ Micros get_delay(int &state) {
 
     if (curr < value) {
       value = curr;
-      state = i;
+      task = (Task)i;
     }
   }
 
@@ -210,6 +212,9 @@ void read_bmp() {
   }
 
   sense_alt.store(bmp.readAltitude(SEA_PRESSURE));
+
+  velocity.store((sense_alt.load() - altitude.load()) / BMP_DELAY_SEC);
+  altitude.store(sense_alt.load());
 }
 
 void read_bno() {
@@ -227,25 +232,16 @@ void read_bno() {
   }
 }
 
-void calc_estimations() {
-  velocity.store((sense_alt.load() - altitude.load()) / EST_DELAY_SEC);
-  altitude.store(sense_alt.load());
-}
-
 // This is not code uses some pretty slow functions and should be reconsidered
 float calc_error() {
-  // It estimates the height assuming that the servo is half between the current and max extension
-  // Since we are more concerned about over and undershoots
-  float drag = DRAG + (SERVO_DRAG * 0.5F * (servo_pwm + SERVO_MAX));
-  float c1 = G / drag - velocity.load() - 1;
-  float max_time = log(-c1 * drag / G) * drag;
+  float c1 = -velocity.load() - (G / DRAG);
+  float max_time = log(-c1 * DRAG / G) * DRAG;
 
-  float max_alt = (((c1 * exp(-drag * max_time)) - (G * max_time) - c1) / drag) + altitude.load();
-
-  return TARGET_HEIGHT - max_alt;
+  float max_alt = (((c1 * exp(-DRAG * max_time)) - (G * max_time) - c1) / DRAG) + altitude.load();
+  return max_alt - TARGET_HEIGHT;
 }
 
-void set_state(int next) {
+void set_state(State next) {
   curr_state_time = millis();
 
   switch (next) {
@@ -262,12 +258,11 @@ void set_state(int next) {
   case ARMED:
     push_event("New state ARMED");
 
+    // Calling twice will init velocity properly
     read_bmp();
-    read_bno();
+    read_bmp();
 
-    // This will properly initialize all the values to something sane
-    calc_estimations();
-    calc_estimations();
+    read_bno();
 
     set_servo(SERVO_FLUSH);
     break;
@@ -300,17 +295,29 @@ void run_state() {
   case ARMING:
     if (digitalRead(PIN_ARM)) {
       if (curr_state_time + ARM_TIME <= millis())
-        set_state(PREFLIGHT);
+        set_state(ARMED);
     } else {
       set_state(PREFLIGHT);
     }
 
     break;
   case ARMED:
+    // TODO: Make this more robust
+    if (altitude.load() > 10) {
+      set_state(BURN);
+    }
     break;
   case BURN:
+    // TODO: Make this more robust
+    if (sense_acc.load().acceleration.y < 1) {
+      set_state(FLYING);
+    }
     break;
   case FLYING:
+    // TODO: Make this more robust
+    if (velocity.load() < 5) {
+      set_state(DONE);
+    }
     break;
   case DONE:
     break;
@@ -321,7 +328,7 @@ void setup() {
   Wire.begin();
   push_event("Wire inited");
 
-  if (!bmp.begin_I2C(BMP_ADDR)) {
+  if (!bmp.begin_I2C(BMP_ADDR, &Wire)) {
     push_event("BMP failed");
     return;
   }
@@ -377,10 +384,10 @@ void setup() {
 
 void setup1() {
   Serial.begin(115200);
-  log("Started serial");
+  write_log("Started serial");
 
   if (sd.begin(SD_CONFIG)) {
-    log("SD inited");
+    write_log("SD inited");
 
     sd.mkdir("Logs");
     sd.mkdir("Data");
@@ -397,23 +404,23 @@ void setup1() {
       data_file = sd.open(data_path, O_CREAT | O_WRITE | O_APPEND);
       data_file.println("time,altitude");
 
-      log("Files " + String(i) + " created");
+      write_log("Files " + String(i) + " created");
       break;
     }
   } else {
-    log("SD init failed");
+    write_log("SD init failed");
   }
 
   pinMode(LED_BUILTIN, OUTPUT);
-  log("Init aux pins");
+  write_log("Init aux pins");
 
-  log("Aux inited");
+  write_log("Aux inited");
 }
 
 void update_loop() {
   float error = calc_error();
 
-  integral_sum += error * EST_DELAY_SEC;
+  integral_sum += error * PID_DELAY_SEC;
   if (integral_sum > I_MAX) {
     integral_sum = INT_MAX;
   } else if (integral_sum < -I_MAX) {
@@ -422,12 +429,11 @@ void update_loop() {
 
   float p_out = P * error;
   float i_out = I * integral_sum;
-  float d_out = D * (error - prev_error) / EST_DELAY_SEC;
+  float d_out = D * (error - prev_error) / PID_DELAY_SEC;
 
   prev_error = error;
 
   float out = p_out + i_out - d_out;
-
   servo_pwm.store(to_servo_pwm(out));
 }
 
@@ -444,22 +450,19 @@ void loop() {
     task_timers[BNO] += BNO_DELAY;
     break;
   case PID:
-    calc_estimations();
-
     if (state == FLYING) {
       update_loop();
       set_servo(servo_pwm.load());
     }
 
-    task_timers[PID] += EST_DELAY;
+    task_timers[PID] += PID_DELAY;
     break;
   case MISC:
-    run_state();
-
     task_timers[MISC] += MISC_DELAY;
     break;
   }
 
+  run_state();
   delayMicroseconds(get_delay(task));
 }
 
@@ -471,7 +474,7 @@ void loop1() {
 
   Event event;
   while (pop_event(event)) {
-    log(event);
+    write_log(event);
   }
 
   // This loop doesn't need to run on a strict time

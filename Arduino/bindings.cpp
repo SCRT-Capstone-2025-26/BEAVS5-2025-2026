@@ -63,12 +63,20 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
       .def_readwrite("pressure", &Adafruit_BMP3XX::pressure_s)
       .def_readwrite("altitude", &Adafruit_BMP3XX::altitude_s);
 
+  pybind11::enum_<State>(mod, "State")
+    .value("ARMED", ARMED)
+    .export_values();
+
   pybind11::class_<Board>(mod, "Board")
       .def_readonly("serial", &Board::Serial)
       .def_readonly("sd", &Board::sd)
       .def_readonly("bno", &Board::bno)
       .def_readonly("bmp", &Board::bmp)
-      .def_readonly("PIN_ARM", &Board::PIN_ARM);
+      .def_readonly("state", &Board::state)
+      .def_readonly("PIN_ARM", &Board::PIN_ARM)
+      .def_readonly("PIN_SERVO", &Board::PIN_SERVO)
+      .def_readonly("SERVO_FLUSH", &Board::SERVO_FLUSH)
+      .def_readonly("SERVO_MAX", &Board::SERVO_MAX);
 
   pybind11::class_<Sim_s>(mod, "Sim")
       .def(pybind11::init<>())
@@ -84,9 +92,9 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
              sim.pins_s[pin].value = value;
            })
       .def("get_pin",
-           [](Sim_s &sim, uint8_t pin) {
+           [](Sim_s &sim, uint8_t pin, bool analog) {
              assert(pin < pin_count_s);
-             assert(sim.pins_s[pin].mode == OUTPUT);
+             assert(analog || sim.pins_s[pin].mode == OUTPUT);
 
              return sim.pins_s[pin].value;
            })

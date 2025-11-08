@@ -1,4 +1,3 @@
-#include "InterpolationLib.h"
 #include "bmp.h"
 #include "bno.h"
 #include "misc.h"
@@ -7,6 +6,7 @@
 
 #include <atomic>
 #include <deque>
+#include <cmath>
 
 class Sim_s;
 
@@ -28,6 +28,7 @@ public:
   void delayMicroseconds(unsigned long value);
 
   HardwareSerial_s Serial;
+  TwoWire Wire;
 
 ------
 

@@ -81,6 +81,18 @@ def make_source(source, header_name, adds):
     return b'#include "%s"\n\n%s\n%s\n' % (header_name, adds, defis)
 
 
+# This is for the makefile
+def replace(path, content):
+    if os.path.exists(path):
+        with open(path, 'rb') as file:
+            if file.read() == content:
+                return
+
+    with open(path, "wb+") as file:
+        file.write(content)
+
+
+# TODO: Use extern in the header file so compilation is faster
 # TODO: Maybe add implicit array sizes
 def classify_file(in_path, out_path, additions_path, name):
     name = name.encode("utf-8")
@@ -106,10 +118,8 @@ def classify_file(in_path, out_path, additions_path, name):
         source, os.path.basename(header_path).encode("utf-8"), source_adds
     )
 
-    with open(header_path, "wb+") as file:
-        file.write(header_text)
-    with open(source_path, "wb+") as file:
-        file.write(source_text)
+    replace(header_path, header_text)
+    replace(source_path, source_text)
 
 
 if __name__ == "__main__":

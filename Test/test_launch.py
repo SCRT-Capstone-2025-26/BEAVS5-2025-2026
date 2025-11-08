@@ -1,19 +1,71 @@
+from . import simple_sim as ss
 import beavs_sim as sim
+from matplotlib import pyplot as plt
+import sys
+
+def boot(s):
+    s.set_pin(s.board.PIN_ARM, True)
+    s.step_by(5500000)
+    s.set_pin(s.board.PIN_ARM, False)
+    s.step_by(500000)
 
 
-def test_up():
+def test_init():
     s = sim.Sim()
-
-    while s.micros < 40000000:
-        # This may not be the correct equation
-        s.board.bmp.altitude = (((s.micros - 10000000) / 1000000) ** 2) / 2
-        if 10000000 < s.micros:
-            s.board.bno.acc_x = 30
-
-        s.step()
+    boot(s)
 
     content = s.board.serial.contents()
-    print(content)
+    print(content.decode('utf-8'))
 
     content = s.board.sd.get_file("Logs/log_0.txt")
-    print(content)
+    print(content.decode('utf-8'))
+
+    assert s.board.state == sim.State.ARMED
+
+
+def fly(flight_sim):
+    s = sim.Sim()
+    boot(s)
+
+    s.board.bmp.altitude = flight_sim.height
+
+    old_micros = s.micros
+    while flight_sim.velocity >= 0:
+        s.step()
+
+        s.board.bmp.altitude = flight_sim.height
+
+        servo = (s.get_pin(s.board.PIN_SERVO, True) - s.board.SERVO_FLUSH) / (s.board.SERVO_MAX - s.board.SERVO_FLUSH)
+        assert 0 <= servo <= 1
+        flight_sim.step((s.micros - old_micros) / 1000 / 1000, servo)
+        old_micros = s.micros
+
+    return s
+
+
+def try_flight(velocity, drag, servo_drag):
+    flight_sim = ss.SimpleSim(velocity, drag, servo_drag)
+
+    fly(flight_sim)
+
+    ts, data = zip(*flight_sim.history)
+    vs, ys, servs = zip(*data)
+
+    if "pytest" not in sys.modules:
+        plt.plot(ts, ys)
+        plt.show()
+
+        plt.plot(ts, vs)
+        plt.show()
+
+        plt.plot(ts, servs)
+        plt.show()
+
+    assert abs(ys[-1] - 1000) < 5
+
+
+def test_flights():
+    for velocity in [800, 1000, 1200]:
+        for drag in [0.4, 0.5, 0.6]:
+            try_flight(velocity, drag, 3)
+

@@ -6,7 +6,6 @@
 bool Adafruit_BMP3XX::begin_I2C(uint8_t addr, TwoWire *theWire) {
   assert(!began);
   assert(addr == 0x77);
-  assert(theWire == &Wire);
   assert(theWire->began_s());
 
   began = true;

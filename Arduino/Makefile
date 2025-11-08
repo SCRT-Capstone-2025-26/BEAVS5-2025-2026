@@ -7,7 +7,7 @@ TARGET_BIND = beavs_sim$(shell python3-config --extension-suffix)
 LINKFLAGS = -shared
 BUILDFLAGS = -fPIC -O3
 
-LDFLAGS = -lboost_context -lboost_system $(shell python3-config --ldflags)
+LDFLAGS = -lboost_context -lboost_system $(shell python3-config --ldflags) -latomic
 DEPFLAGS = -MMD -MP $(shell python3 -m pybind11 --includes)
 
 SOURCES = $(wildcard *.cpp)
