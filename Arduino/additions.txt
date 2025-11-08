@@ -5,6 +5,9 @@
 #include "sdfat.h"
 #include "wire.h"
 
+#include <atomic>
+#include <deque>
+
 class Sim_s;
 
 ------
@@ -19,6 +22,8 @@ public:
   void pinMode(uint8_t pin, uint8_t mode);
   void digitalWrite(uint8_t pin, uint8_t value);
   int digitalRead(uint8_t pin);
+  void analogWriteResolution(int);
+  void analogWrite(int, int);
   void delay(unsigned long value);
   void delayMicroseconds(unsigned long value);
 
@@ -33,6 +38,8 @@ unsigned long Board::micros() { return sim_s->micros(); }
 void Board::pinMode(uint8_t pin, uint8_t mode) { sim_s->pinMode(pin, mode); }
 void Board::digitalWrite(uint8_t pin, uint8_t value) { sim_s->digitalWrite(pin, value); }
 int Board::digitalRead(uint8_t pin) { return sim_s->digitalRead(pin); }
+void Board::analogWriteResolution(int res) { sim_s->analog_res_s = res; }
+void Board::analogWrite(int pin, int value) { return sim_s->analogWrite(pin, value); }
 void Board::delay(unsigned long value) { sim_s->delay(value); }
 void Board::delayMicroseconds(unsigned long value) { sim_s->delayMicroseconds(value); }
 

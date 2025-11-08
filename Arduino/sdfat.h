@@ -51,6 +51,7 @@ public:
   FsFile() : file_s(nullptr) {}
 
   size_t println(const String &str);
+  void flush();
   bool close();
 
   friend class SdFs;

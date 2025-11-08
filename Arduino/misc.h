@@ -31,6 +31,7 @@ public:
   String(unsigned int x) : std::string(std::to_string(x)) {}
   String(long x) : std::string(std::to_string(x)) {}
   String(unsigned long x) : std::string(std::to_string(x)) {}
+
   String(float x, unsigned char decimalPlaces = 2)
       : std::string(to_precision(x, decimalPlaces)) {}
   String(double x, unsigned char decimalPlaces = 2)
@@ -38,6 +39,11 @@ public:
 
   String operator+(const char *rhs) const;
   String operator+(const String &rhs) const;
+
+  String operator+(int rhs) const { return *this + String(rhs); }
+  String operator+(unsigned int rhs) const { return *this + String(rhs); }
+  String operator+(long rhs) const { return *this + String(rhs); }
+  String operator+(unsigned long rhs) const { return *this + String(rhs); }
 };
 
 class HardwareSerial_s {
@@ -58,7 +64,7 @@ public:
 
 struct Pin_s {
   uint8_t mode;
-  uint8_t value;
+  int value;
 };
 
 using std::atan;
