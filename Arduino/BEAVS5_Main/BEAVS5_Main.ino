@@ -18,7 +18,23 @@ typedef struct {
   String message;
 } Event;
 
-typedef unsigned long TimeType;
+// Spinlocks are not very efficient and should be used sparingly on quick operations
+class SpinLock {
+private:
+    std::atomic_flag flag = ATOMIC_FLAG_INIT;
+
+public:
+    void lock() {
+        while (flag.test_and_set(std::memory_order_acquire));
+    }
+
+    void unlock() {
+        flag.clear(std::memory_order_release);
+    }
+};
+
+typedef unsigned long Millis;
+typedef unsigned long Micros;
 
 // This should be more than enough
 const size_t MAX_EVENTS = 64;
@@ -27,7 +43,7 @@ const uint8_t PIN_SD_CS = 17;
 const SdSpiConfig SD_CONFIG =
     SdSpiConfig(PIN_SD_CS, DEDICATED_SPI, SD_SCK_MHZ(50));
 
-const TimeType AUX_DELAY_MIL = 100;
+const Millis AUX_DELAY = 100;
 
 const uint8_t BMP_ADDR = 0x77;
 
@@ -38,12 +54,12 @@ const uint8_t PIN_SERVO = 28;
 const uint8_t PIN_SERVO_MOSFET = 27;
 const uint8_t PIN_ARM = 29;
 
-const TimeType BMP_DELAY_MIC = 1000;
-const TimeType BNO_DELAY_MIC = 1000;
-const TimeType PID_DELAY_MIC = 1000;
-const TimeType MISC_DELAY_MIC = 10000;
+const Micros BMP_DELAY = 1000;
+const Micros BNO_DELAY = 1000;
+const Micros PID_DELAY = 1000;
+const Micros MISC_DELAY = 10000;
 
-const float PID_DELAY_SEC = (float)PID_DELAY_MIC / 1000.0F / 1000.0F;
+const float PID_DELAY_SEC = (float)PID_DELAY / 1000.0F / 1000.0F;
 
 const float P = 0;
 const float I = 0;
@@ -57,15 +73,17 @@ const int SERVO_MAX = 0;
 
 const float SEA_PRESSURE = 0;
 
+const Millis ARM_TIME = 5 * 1000;
+
 // Shared
-// These could be optimized a bit as a mutex is a bit expensive and could
-// probably be replaced with a circular buffer using atomics. Also AFAIK the
-// atomics cause fences when reading and writing that will slow things down
-std::mutex events_lock;
+// AFAIK the atomics will cause lots of mfences and so could be optimized
+// Espiecally given some are written to one one thread
+// This code will used explicit references to atomic read and write operations
+// There is seemingly no std::mutex so a spinlock will be used
+SpinLock events_lock;
 std::deque<Event> events = std::deque<Event>();
 
-// This code will used explicit references to atomic read and write operations
-std::atomic<int> servo_pwm = 0;
+std::atomic<int> servo_pwm(0);
 
 // Core 1
 bool inited = false;
@@ -73,14 +91,14 @@ Adafruit_BMP3XX bmp;
 Adafruit_BNO055 bno = Adafruit_BNO055(55, BNO_ADDR);
 
 enum { BMP, BNO, PID, MISC, TASK_COUNT };
-TimeType task_timers[TASK_COUNT] = {};
+Micros task_timers[TASK_COUNT] = {};
 // TASK_COUNT will just be ignored it only does logic on the other enum values
 int task = TASK_COUNT;
 
-enum { PREFLIGHT, ARMING, ARMED, FLYING, DONE };
+enum { PREFLIGHT, ARMING, ARMED, BURN, FLYING, DONE };
 int state;
 
-TimeType curr_state_time;
+Micros curr_state_time;
 
 float altitude;
 sensors_event_t gyroscope;
@@ -110,7 +128,7 @@ void log(const String &string) {
 
 // serial_now should only be true in core2
 void push_event(String &&message) {
-  std::scoped_lock<std::mutex> _lock(events_lock);
+  events_lock.lock();
 
   if (events.size() == MAX_EVENTS) {
     // Maybe don't replace if there was already an overflow
@@ -118,31 +136,35 @@ void push_event(String &&message) {
   } else {
     events.push_front((Event){.time = millis(), .message = message});
   }
+
+  events_lock.unlock();
 }
 
 bool pop_event(Event &event) {
-  std::scoped_lock<std::mutex> _lock(events_lock);
+  events_lock.lock();
 
   if (events.empty()) {
+  events_lock.unlock();
     return false;
   }
 
   event = events.back();
   events.pop_back();
 
+  events_lock.unlock();
   return true;
 }
 
 // Micros overflows about every 70 minutes, but because unsigneds
 // implement modulo arithmetic it shouldn't matter
-TimeType get_delay(int &state) {
+Micros get_delay(int &state) {
   // If there were more tasks a min heap should be used
-  TimeType time = micros();
-  TimeType value = ULONG_LONG_MAX;
+  Micros time = micros();
+  Micros value = ULONG_LONG_MAX;
   for (int i = 0; i < TASK_COUNT; i++) {
     // Time has to be subtracted from each to make sure that overflows don't
     // affect the system in weird ways
-    TimeType curr = task_timers[i] - time;
+    Micros curr = task_timers[i] - time;
     // This checks if the task_timers[i] is smaller than time (it will not
     // trigger on an overflow though)
     if (curr > ULONG_LONG_MAX / 2) {
@@ -214,11 +236,14 @@ void set_state(int next) {
 
     set_servo(SERVO_FLUSH);
     break;
+  case BURN:
+    break;
   case FLYING:
     push_event("New state FLYING");
 
-    read_bmp();
-    read_bno();
+    // Maybe these should to be run to make sure things are inited
+    // read_bmp();
+    // read_bno();
 
     integral_sum = 0;
     prev_error = calc_error();
@@ -243,7 +268,7 @@ void run_state() {
     break;
   case ARMING:
     if (digitalRead(PIN_ARM)) {
-      if (curr_state_time + (5 * 1000) <= millis())
+      if (curr_state_time + ARM_TIME <= millis())
         set_state(PREFLIGHT);
     } else {
       set_state(PREFLIGHT);
@@ -251,6 +276,8 @@ void run_state() {
 
     break;
   case ARMED:
+    break;
+  case BURN:
     break;
   case FLYING:
     break;
@@ -306,7 +333,7 @@ void setup() {
 
   push_event("Pins inited");
 
-  TimeType time = micros();
+  Micros time = micros();
   task_timers[0] = time;
   task_timers[1] = time;
   task_timers[2] = time;
@@ -378,12 +405,12 @@ void loop() {
   case BMP:
     read_bmp();
 
-    task_timers[BMP] += BMP_DELAY_MIC;
+    task_timers[BMP] += BMP_DELAY;
     break;
   case BNO:
     read_bno();
 
-    task_timers[BNO] += BNO_DELAY_MIC;
+    task_timers[BNO] += BNO_DELAY;
     break;
   case PID:
     if (state == FLYING) {
@@ -391,12 +418,12 @@ void loop() {
       set_servo(servo_pwm.load());
     }
 
-    task_timers[PID] += PID_DELAY_MIC;
+    task_timers[PID] += PID_DELAY;
     break;
   case MISC:
     run_state();
 
-    task_timers[MISC] += MISC_DELAY_MIC;
+    task_timers[MISC] += MISC_DELAY;
     break;
   }
 
@@ -415,5 +442,5 @@ void loop1() {
   }
 
   // This loop doesn't need to run on a strict time
-  delay(AUX_DELAY_MIL);
+  delay(AUX_DELAY);
 }
