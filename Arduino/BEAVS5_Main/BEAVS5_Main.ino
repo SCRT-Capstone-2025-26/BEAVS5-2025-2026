@@ -56,10 +56,10 @@ const uint8_t PIN_ARM = 29;
 
 const Micros BMP_DELAY = 1000;
 const Micros BNO_DELAY = 1000;
-const Micros PID_DELAY = 1000;
+const Micros EST_DELAY = 500;
 const Micros MISC_DELAY = 10000;
 
-const float PID_DELAY_SEC = (float)PID_DELAY / 1000.0F / 1000.0F;
+const float EST_DELAY_SEC = (float)EST_DELAY / 1000.0F / 1000.0F;
 
 const float P = 0;
 const float I = 0;
@@ -75,6 +75,11 @@ const float SEA_PRESSURE = 0;
 
 const Millis ARM_TIME = 5 * 1000;
 
+const float TARGET_HEIGHT = 10000;
+const float G = 9.81;
+const float DRAG = 0.5F;
+const float SERVO_DRAG = 0.1;
+
 // Shared
 // AFAIK the atomics will cause lots of mfences and so could be optimized
 // Espiecally given some are written to one one thread
@@ -83,7 +88,14 @@ const Millis ARM_TIME = 5 * 1000;
 SpinLock events_lock;
 std::deque<Event> events = std::deque<Event>();
 
-std::atomic<int> servo_pwm(0);
+std::atomic<int> servo_pwm;
+
+std::atomic<float> altitude;
+std::atomic<float> velocity;
+
+std::atomic<float> sense_alt;
+std::atomic<sensors_event_t> sense_gyro;
+std::atomic<sensors_event_t> sense_acc;
 
 // Core 1
 bool inited = false;
@@ -99,10 +111,6 @@ enum { PREFLIGHT, ARMING, ARMED, BURN, FLYING, DONE };
 int state;
 
 Micros curr_state_time;
-
-float altitude;
-sensors_event_t gyroscope;
-sensors_event_t accelerometer;
 
 float integral_sum;
 float prev_error;
@@ -202,20 +210,41 @@ void read_bmp() {
     push_event("BMP failure");
   }
 
-  altitude = bmp.readAltitude(SEA_PRESSURE);
+  sense_alt.store(bmp.readAltitude(SEA_PRESSURE));
 }
 
 void read_bno() {
-  if (!bno.getEvent(&accelerometer, Adafruit_BNO055::VECTOR_LINEARACCEL)) {
+  sensors_event_t sense;
+  if (!bno.getEvent(&sense, Adafruit_BNO055::VECTOR_LINEARACCEL)) {
     push_event("BNO accelerometer failure");
+  } else {
+    sense_acc.store(sense);
   }
 
-  if (!bno.getEvent(&gyroscope, Adafruit_BNO055::VECTOR_EULER)) {
-    push_event("BNO accelerometer failure");
+  if (!bno.getEvent(&sense, Adafruit_BNO055::VECTOR_EULER)) {
+    push_event("BNO gyroscope failure");
+  } else {
+    sense_gyro.store(sense);
   }
 }
 
-float calc_error() { return 0; }
+void calc_estimations() {
+  velocity.store((sense_alt.load() - altitude.load()) / EST_DELAY_SEC);
+  altitude.store(sense_alt.load());
+}
+
+// This is not code uses some pretty slow functions and should be reconsidered
+float calc_error() {
+  // It estimates the height assuming that the servo is half between the current and max extension
+  // Since we are more concerned about over and undershoots
+  float drag = DRAG + (SERVO_DRAG * 0.5F * (servo_pwm + SERVO_MAX));
+  float c1 = G / drag - velocity.load() - 1;
+  float max_time = log(-c1 * drag / G) * drag;
+
+  float max_alt = (((c1 * exp(-drag * max_time)) - (G * max_time) - c1) / drag) + altitude.load();
+
+  return TARGET_HEIGHT - max_alt;
+}
 
 void set_state(int next) {
   curr_state_time = millis();
@@ -234,16 +263,19 @@ void set_state(int next) {
   case ARMED:
     push_event("New state ARMED");
 
+    read_bmp();
+    read_bno();
+
+    // This will properly initialize all the values to something sane
+    calc_estimations();
+    calc_estimations();
+
     set_servo(SERVO_FLUSH);
     break;
   case BURN:
     break;
   case FLYING:
     push_event("New state FLYING");
-
-    // Maybe these should to be run to make sure things are inited
-    // read_bmp();
-    // read_bno();
 
     integral_sum = 0;
     prev_error = calc_error();
@@ -382,7 +414,7 @@ void setup1() {
 void update_loop() {
   float error = calc_error();
 
-  integral_sum += error * PID_DELAY_SEC;
+  integral_sum += error * EST_DELAY_SEC;
   if (integral_sum > I_MAX) {
     integral_sum = INT_MAX;
   } else if (integral_sum < -I_MAX) {
@@ -391,7 +423,7 @@ void update_loop() {
 
   float p_out = P * error;
   float i_out = I * integral_sum;
-  float d_out = D * (error - prev_error) / PID_DELAY_SEC;
+  float d_out = D * (error - prev_error) / EST_DELAY_SEC;
 
   prev_error = error;
 
@@ -413,12 +445,14 @@ void loop() {
     task_timers[BNO] += BNO_DELAY;
     break;
   case PID:
+    calc_estimations();
+
     if (state == FLYING) {
       update_loop();
       set_servo(servo_pwm.load());
     }
 
-    task_timers[PID] += PID_DELAY;
+    task_timers[PID] += EST_DELAY;
     break;
   case MISC:
     run_state();
