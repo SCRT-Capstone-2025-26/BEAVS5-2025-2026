@@ -70,8 +70,8 @@ const float D = 0;
 const float I_MAX = 0;
 
 const int SERVO_RETRACTED = 0;
-const int SERVO_FLUSH = 50;
-const int SERVO_MAX = 100;
+const int SERVO_FLUSH = 500;
+const int SERVO_MAX = 10000;
 
 const float SEA_PRESSURE = 0;
 
