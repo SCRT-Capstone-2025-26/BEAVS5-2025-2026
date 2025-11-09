@@ -18,11 +18,10 @@ with chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Arduino")):
 
 del sp
 del chdir
-del os
 
 del res
 
-if "pytest" not in sys.modules:
+if "pytest" not in sys.modules or os.getcwd() != os.path.dirname(os.path.abspath(__file__)):
     # This is maybe stupid
     from . import beavs_sim  # noqa E402
 
@@ -34,4 +33,5 @@ if "pytest" not in sys.modules:
     del attr
     del beavs_sim
 
+del os
 del sys
