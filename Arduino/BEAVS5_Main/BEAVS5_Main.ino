@@ -54,10 +54,10 @@ const uint8_t PIN_SERVO = 28;
 const uint8_t PIN_SERVO_MOSFET = 27;
 const uint8_t PIN_ARM = 29;
 
-const Micros BMP_DELAY = 1000;
-const Micros BNO_DELAY = 1000;
+const Micros BMP_DELAY = 10000;
+const Micros BNO_DELAY = 10000;
 // Running PID faster than sensors is kinda pointless
-const Micros PID_DELAY = 500;
+const Micros PID_DELAY = 5000;
 const Micros MISC_DELAY = 10000;
 
 const float BMP_DELAY_SEC = (float)BMP_DELAY / 1000.0F / 1000.0F;
@@ -67,7 +67,7 @@ const float P = 0.1;
 const float I = 0;
 const float D = 0;
 
-const float I_MAX = 0;
+const float I_MAX = 1e10;
 
 const int SERVO_RETRACTED = 0;
 const int SERVO_FLUSH = 500;
@@ -422,7 +422,7 @@ void update_loop() {
 
   integral_sum += error * PID_DELAY_SEC;
   if (integral_sum > I_MAX) {
-    integral_sum = INT_MAX;
+    integral_sum = I_MAX;
   } else if (integral_sum < -I_MAX) {
     integral_sum = -I_MAX;
   }
