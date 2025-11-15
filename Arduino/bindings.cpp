@@ -59,9 +59,7 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
           });
 
   pybind11::class_<Adafruit_BMP3XX>(mod, "BMP")
-      .def_readwrite("tempurature", &Adafruit_BMP3XX::tempurature_s)
-      .def_readwrite("pressure", &Adafruit_BMP3XX::pressure_s)
-      .def_readwrite("altitude", &Adafruit_BMP3XX::altitude_s);
+      .def_readwrite("pressure", &Adafruit_BMP3XX::pressure_s);
 
   pybind11::enum_<State>(mod, "State")
     .value("ARMED", ARMED)

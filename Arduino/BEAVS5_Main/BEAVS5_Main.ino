@@ -54,11 +54,20 @@ const uint8_t PIN_SERVO = 28;
 const uint8_t PIN_SERVO_MOSFET = 27;
 const uint8_t PIN_ARM = 29;
 
+// The sensors are read in forced mode so the read just takes 1 / sensor_rate
+// which is pretty slow at higher sampling rates if this is deemed to matter
+// We will have to remove the usage of libraries for the sensors
+// The offsets should ensure they don't collide (given 1 / sensor_rate these times may actually be to fast)
+// PID should take less time given that it is only calculations
+// and MISC should take almost 0 time
 const Micros BMP_DELAY = 10000;
+const Micros BMP_OFFSET = 0;
 const Micros BNO_DELAY = 10000;
-// Running PID faster than sensors is kinda pointless
-const Micros PID_DELAY = 5000;
+const Micros BNO_OFFSET = 3000;
+const Micros PID_DELAY = 10000;
+const Micros PID_OFFSET = 6000;
 const Micros MISC_DELAY = 10000;
+const Micros MISC_OFFSET = 9000;
 
 const float BMP_DELAY_SEC = (float)BMP_DELAY / 1000.0F / 1000.0F;
 const float PID_DELAY_SEC = (float)PID_DELAY / 1000.0F / 1000.0F;
@@ -104,7 +113,8 @@ Adafruit_BMP3XX bmp;
 Adafruit_BNO055 bno = Adafruit_BNO055(55, BNO_ADDR, &Wire);
 
 typedef enum { BMP, BNO, PID, MISC, TASK_COUNT } Task;
-Micros task_timers[TASK_COUNT] = {};
+// The initial values are teated as offsets
+Micros task_timers[TASK_COUNT] = { BMP_OFFSET, BNO_OFFSET, PID_OFFSET, MISC_OFFSET };
 // TASK_COUNT will just be ignored it only does logic on the other enum values
 Task task = TASK_COUNT;
 
@@ -211,7 +221,7 @@ void read_bmp() {
     push_event("BMP failure");
   }
 
-  sense_alt.store(bmp.readAltitude(SEA_PRESSURE));
+  sense_alt.store(bmp.readPressure());
 
   velocity.store((sense_alt.load() - altitude.load()) / BMP_DELAY_SEC);
   altitude.store(sense_alt.load());
@@ -333,21 +343,13 @@ void setup() {
     return;
   }
 
-  if (!bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_8X)) {
+  if (!bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_2X)) {
     push_event("BMP temp sampling failed");
     return;
   }
 
-  if (!bmp.setPressureOversampling(BMP3_OVERSAMPLING_16X)) {
+  if (!bmp.setPressureOversampling(BMP3_OVERSAMPLING_32X)) {
     push_event("BMP pressure sampling failed");
-    return;
-  }
-  if (!bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3)) {
-    push_event("BMP IIR failed");
-    return;
-  }
-  if (!bmp.setOutputDataRate(BMP3_ODR_50_HZ)) {
-    push_event("BMP rate failed");
     return;
   }
 
@@ -372,9 +374,10 @@ void setup() {
   push_event("Pins inited");
 
   Micros time = micros();
-  task_timers[0] = time;
-  task_timers[1] = time;
-  task_timers[2] = time;
+  // Addition allows the global init to be treated as offsets
+  task_timers[0] += time;
+  task_timers[1] += time;
+  task_timers[2] += time;
 
   set_state(PREFLIGHT);
 
