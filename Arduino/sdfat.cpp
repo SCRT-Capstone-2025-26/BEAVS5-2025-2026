@@ -13,7 +13,8 @@ size_t FsFile::println(const String &str) {
     return 0;
   }
 
-  // \r\n I think is the correct ending
+  // https://github.com/greiman/SdFat/blob/cda057318bec196183d4cc92b01bc1dd64bbfb02/extras/cppcheck/api/Print.cpp#L150-L153
+  // This appears to be the ending used by the SdFat library printing
   file_s->content << str << "\r\n";
 
   return str.length() + 2;

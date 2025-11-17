@@ -1,5 +1,6 @@
 import math
 
+# TODO: Replace with simulation from https://github.com/SCRT-Capstone-2025-26/SCRT_Rocket_SIM
 class SimpleSim():
     def __init__(self, velocity, drag, servo_drag, g=9.81):
         self.height = 0

@@ -19,6 +19,7 @@ def sample(p, i, d, velocity_r=[800, 1000, 1200], drag_r=[0.3, 0.5, 0.7], servo_
     return -max_value
 
 
+# TODO: Use real PID optimization methods for tuning
 def run_opt(init=70, iters=30, p_r=(0, 0.3), i_r=(-0.01, 0.01), d_r=(-0.1, 0.1),
             velocity_r=[800, 1000, 1200],
             drag_r=[0.3, 0.5, 0.7],

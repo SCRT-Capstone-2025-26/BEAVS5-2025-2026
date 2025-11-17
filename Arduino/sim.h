@@ -42,6 +42,9 @@ public:
 
   Board board_s;
 
+  // https://docs.arduino.cc/language-reference/en/functions/analog-io/analogWriteResolution/
+  // Arduino seemingly uses a global variable for the resolution of the analog writes for compatibility
+  // It is defaulted to 8. This is different to the analog read default of 10 bits (although unused in this code)
   // TODO: Restrictions on this number maybe
   int analog_res_s = 8;
 
