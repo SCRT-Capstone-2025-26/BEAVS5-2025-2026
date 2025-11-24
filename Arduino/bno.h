@@ -51,7 +51,7 @@ public:
     VECTOR_LINEARACCEL = BNO055_LINEAR_ACCEL_DATA_X_LSB_ADDR,
   } adafruit_vector_type_t;
 
-  Adafruit_BNO055(int32_t sensorID, uint8_t address, TwoWire *theWire = &Wire);
+  Adafruit_BNO055(int32_t sensorID, uint8_t address, TwoWire *theWire);
 
   sensors_vec_t acc_state_s = {};
   sensors_vec_t gyro_state_s = {};

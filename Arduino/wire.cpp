@@ -8,5 +8,3 @@ void TwoWire::begin() {
 }
 
 bool TwoWire::began_s() const { return began; }
-
-TwoWire Wire;

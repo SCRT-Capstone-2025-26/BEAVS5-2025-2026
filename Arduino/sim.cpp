@@ -98,6 +98,12 @@ int Sim_s::digitalRead(uint8_t pin) {
   return pins_s[pin].value;
 }
 
+void Sim_s::analogWrite(int pin, int value) {
+  assert(pin < pin_count_s);
+
+  pins_s[pin].value = value & ((1 << analog_res_s) - 1);
+}
+
 void Sim_s::delay(unsigned long value) { delayMicroseconds(value * 1000); }
 
 void Sim_s::delayMicroseconds(unsigned long value) {

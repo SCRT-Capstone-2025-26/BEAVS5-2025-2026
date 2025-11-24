@@ -22,7 +22,7 @@ public:
   float pressure_s = 0.0F;
   float altitude_s = 0.0F;
 
-  bool begin_I2C(uint8_t addr, TwoWire *theWire = &Wire);
+  bool begin_I2C(uint8_t addr, TwoWire *theWire);
   float readTemperature();
   float readPressure();
   float readAltitude(float seaLevel);

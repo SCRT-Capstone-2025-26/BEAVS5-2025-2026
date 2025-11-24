@@ -6,7 +6,7 @@ import os
 
 def get_function(node, name):
     for child in node.children:
-        if child.type == "primitive_type":
+        if child.type == "primitive_type" or child.type == "type_identifier":
             type_node = child
         elif child.type == "function_declarator":
             decl_node = child
@@ -17,6 +17,17 @@ def get_function(node, name):
     defi = b"%s %s::%s %s" % (type_node.text, name, decl_node.text, stmt_node.text)
 
     return decl, defi
+
+
+def get_declaration(node):
+    children = []
+    for child in node.children:
+        if child.type == "type_qualifier" and child.text == b"const":
+            continue
+
+        children.append(child.text)
+
+    return b" ".join(children)
 
 
 def read_decls(node, name):
@@ -34,7 +45,9 @@ def read_decls(node, name):
             in_class.append(decl)
             source.append(defi)
         elif child.type == "declaration":
-            in_class.append(b"%s" % (child.text))
+            in_class.append(get_declaration(child))
+        elif child.type == "type_definition":
+            out_class.append(b"%s" % (child.text))
         elif child.type == "enum_specifier":
             in_class.append(b"%s;" % (child.text))
         elif child.type == "preproc_def":
@@ -68,6 +81,18 @@ def make_source(source, header_name, adds):
     return b'#include "%s"\n\n%s\n%s\n' % (header_name, adds, defis)
 
 
+# This is for the makefile
+def replace(path, content):
+    if os.path.exists(path):
+        with open(path, 'rb') as file:
+            if file.read() == content:
+                return
+
+    with open(path, "wb+") as file:
+        file.write(content)
+
+
+# TODO: Use extern in the header file so compilation is faster
 # TODO: Maybe add implicit array sizes
 def classify_file(in_path, out_path, additions_path, name):
     name = name.encode("utf-8")
@@ -93,10 +118,8 @@ def classify_file(in_path, out_path, additions_path, name):
         source, os.path.basename(header_path).encode("utf-8"), source_adds
     )
 
-    with open(header_path, "wb+") as file:
-        file.write(header_text)
-    with open(source_path, "wb+") as file:
-        file.write(source_text)
+    replace(header_path, header_text)
+    replace(source_path, source_text)
 
 
 if __name__ == "__main__":

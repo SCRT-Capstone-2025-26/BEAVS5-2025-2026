@@ -12,6 +12,4 @@ public:
   bool began_s() const;
 };
 
-extern TwoWire Wire;
-
 #endif

@@ -8,7 +8,6 @@ Adafruit_BNO055::Adafruit_BNO055(int32_t sensorID, uint8_t address,
   assert(!began);
   assert(sensorID == 55);
   assert(address == 0x28);
-  assert(theWire == &Wire);
 
   wire = theWire;
 }

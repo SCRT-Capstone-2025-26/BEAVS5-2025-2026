@@ -1,3 +1,0 @@
-[4.51s] Initiating logger with index 44.
-[4.57s] Startup complete.
-[4.66s] Safety pin removed. BEAVS arming.
