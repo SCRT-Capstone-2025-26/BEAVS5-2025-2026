@@ -26,6 +26,10 @@ expected.
 
 To run the tests simply run ``pytest`` in the root.
 
+## Notes
+
+Unlabeled units are in standard metric units and variables ending in _s means they should not be used by the firmware code.
+
 ## Team
 
 This was created for an OSU capstone and more info can be found at the main [repo](https://github.com/SCRT-Capstone-2025-26/SCRT_Rocket_SIM).

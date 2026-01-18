@@ -447,6 +447,7 @@ void update_loop() {
   servo_pwm.store(to_servo_pwm(out));
 }
 
+// TODO: Check what happens with multiple sensors using one I2C wire
 void loop() {
   switch (task) {
   case BMP:

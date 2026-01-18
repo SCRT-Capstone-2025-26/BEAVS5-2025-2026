@@ -3,11 +3,13 @@
 
 #include "board.h"
 #include "misc.h"
+#include "wire.h"
 #include <boost/coroutine2/all.hpp>
 #include <functional>
 
 const int pin_count_s = 30;
 
+// TODO:Have sensors check if multiple threads are using the wire
 class Sim_s {
   unsigned long long micros0 = 0;
   unsigned long long micros1 = 0;
@@ -31,6 +33,7 @@ public:
         cpu1(std::bind(&Sim_s::run1, this, std::placeholders::_1)),
         board_s(this) {
     board_s.bmp.sim_s = this;
+    wire_s = &board_s.Wire;
   };
 
   unsigned long millis();
@@ -43,6 +46,7 @@ public:
   void delayMicroseconds(unsigned long);
 
   Board board_s;
+  TwoWire &wire_s;
 
   // https://docs.arduino.cc/language-reference/en/functions/analog-io/analogWriteResolution/
   // Arduino seemingly uses a global variable for the resolution of the analog writes for compatibility
@@ -53,6 +57,9 @@ public:
   unsigned long long micros_s = 0;
   Pin_s pins_s[pin_count_s] = {};
   Pin_s analog_pins_s[pin_count_s] = {};
+
+  float temperature_s;
+  float pressure_s;
 
   void step();
   void step_to(unsigned long long time);
