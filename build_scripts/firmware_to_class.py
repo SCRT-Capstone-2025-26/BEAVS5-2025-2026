@@ -3,7 +3,6 @@ import tree_sitter_cpp as tscpp
 import argparse
 import os
 
-
 def get_function(node, name):
     for child in node.children:
         if child.type == "primitive_type" or child.type == "type_identifier":

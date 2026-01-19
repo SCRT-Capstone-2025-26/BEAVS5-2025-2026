@@ -1,12 +1,12 @@
 /.vscode
-Arduino/*.o
-Arduino/*.d
-Arduino/.cache
-Arduino/sim.so
-Arduino/.buildflags.txt
-Arduino/.deps
-Arduino/board.cpp
-Arduino/board.h
+src/*.o
+src/*.d
+src/.cache
+src/sim.so
+src/.buildflags.txt
+src/.deps
+src/board.cpp
+src/board.h
 
 pyrightconfig.json
 compile_commands.json
