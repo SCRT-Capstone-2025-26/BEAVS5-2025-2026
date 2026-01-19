@@ -3,9 +3,9 @@ requires = ["scikit-build-core", "pybind11", "tree-sitter", "tree-sitter-cpp"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "Beavs5"
+name = "beavs_sim"
 version = "0.0.1"
-description = "Firmware and simulation for Beav5"
+description = "Firmware and simulation for Beavs5"
 readme = "README.md"
 dependencies = []
 
