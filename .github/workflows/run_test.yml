@@ -24,8 +24,7 @@ jobs:
           sudo apt-get install libboost-coroutine-dev clang-tidy
       - name: Build
         run: |
-          cd Arduino
-          make
+          pip install -e ".[test]"
       - name: Test with pytest
         run: |
           pytest -v -s
