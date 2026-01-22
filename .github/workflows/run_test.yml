@@ -33,7 +33,7 @@ jobs:
       matrix:
         python-version: ["3.12"]
 
-    if: matrix.os == 'ubuntu-latest' || github.event_name == 'pull_request'
+    if: ${{ runner.os == 'Linux' || github.event_name == 'pull_request' }} # Maybe || github.ref_name == 'main'
 
     steps:
       - uses: actions/checkout@v3
