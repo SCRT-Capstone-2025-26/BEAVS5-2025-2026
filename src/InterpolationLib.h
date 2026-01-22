@@ -68,7 +68,7 @@ public:
                                   bool trim = true);
 
 private:
-  static double catmullSlope(double x[], double y[], int n, int i);
+  static double catmullSlope(double x[], double y[], int i);
   static double getFirstDerivate(double x[], double y[], int n, int i);
   static double getLeftSecondDerivate(double x[], double y[], int n, int i);
   static double getRightSecondDerivate(double x[], double y[], int n, int i);

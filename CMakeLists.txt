@@ -67,4 +67,10 @@ if(CXX_LINKS_ATOMIC)
     target_link_libraries(beavs_sim PRIVATE atomic)
 endif()
 
+if(MSVC)
+  target_compile_options(beavs_sim PRIVATE /W4 /WX)
+else()
+  target_compile_options(beavs_sim PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 install(TARGETS beavs_sim DESTINATION .)

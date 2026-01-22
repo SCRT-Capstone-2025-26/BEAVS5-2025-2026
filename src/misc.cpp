@@ -21,8 +21,8 @@ String String::operator+(const char *rhs) const {
 }
 
 bool HardwareSerial_s::begin(unsigned long baud) {
-  assert(!began);
-  assert(baud == 115200);
+  if (began) { throw std::invalid_argument("Hasn't began"); }
+  if (baud != 115200) { throw std::invalid_argument("Unsupported baud"); }
 
   began = true;
   return true;

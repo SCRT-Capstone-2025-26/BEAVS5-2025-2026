@@ -1,9 +1,10 @@
 #include "wire.h"
 
 #include <cassert>
+#include <stdexcept>
 
 void TwoWire::begin() {
-  assert(!began);
+  if (began) { throw std::invalid_argument("Already began"); }
   began = true;
 }
 

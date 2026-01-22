@@ -77,29 +77,29 @@ unsigned long Sim_s::micros() {
 }
 
 void Sim_s::pinMode(uint8_t pin, uint8_t mode) {
-  assert(pin < pin_count_s);
-  assert(mode == OUTPUT || mode == INPUT);
+  if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
+  if (mode != OUTPUT && mode != INPUT) { throw std::invalid_argument("Invalid mode"); }
 
   pins_s[pin].mode = mode;
 }
 
 void Sim_s::digitalWrite(uint8_t pin, uint8_t value) {
-  assert(pin < pin_count_s);
-  assert(value == LOW || value == HIGH);
-  assert(pins_s[pin].mode == OUTPUT);
+  if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
+  if (value != LOW && value != HIGH) { throw std::invalid_argument("Invalid value"); }
+  if (pins_s[pin].mode != OUTPUT) { throw std::invalid_argument("Unwriteable pin"); }
 
   pins_s[pin].value = value;
 }
 
 int Sim_s::digitalRead(uint8_t pin) {
-  assert(pin < pin_count_s);
-  assert(pins_s[pin].mode == INPUT);
+  if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
+  if (pins_s[pin].mode != INPUT) { throw std::invalid_argument("Unreadable pin"); }
 
   return pins_s[pin].value;
 }
 
 void Sim_s::analogWrite(int pin, int value) {
-  assert(pin < pin_count_s);
+  if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
 
   pins_s[pin].value = value & ((1 << analog_res_s) - 1);
 }

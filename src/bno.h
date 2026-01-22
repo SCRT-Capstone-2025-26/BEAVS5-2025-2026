@@ -10,27 +10,20 @@ typedef enum {
   SENSOR_TYPE_LINEAR_ACCELERATION = (10),
 } sensors_type_t;
 
-typedef struct {
-  union {
-    struct {
-      float x;
-      float y;
-      float z;
-    };
-    struct {
-      float roll;
-      float pitch;
-      float heading;
-    };
-  };
+struct sensors_vec_t {
+  // This prevents ISO C++ warnings while mainting the access syntax used in the library
+  // It doesn't really matter sense this sensor is being removed
+  union { float x; float roll; };
+  union { float y; float pitch; };
+  union { float z; float heading; };
   int8_t status;
-} sensors_vec_t;
+};
 
-typedef struct {
+struct sensors_event_t {
   int32_t type;
   sensors_vec_t acceleration;
   sensors_vec_t orientation;
-} sensors_event_t;
+};
 
 // TODO: Finish this to specs
 class Adafruit_BNO055 {

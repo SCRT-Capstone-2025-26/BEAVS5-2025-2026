@@ -26,17 +26,17 @@ bool FsFile::close() {
 }
 
 bool SdFs::begin(SdSpiConfig spiConfig) {
-  assert(!began);
-  assert(spiConfig.csPin == 17);
-  assert(spiConfig.options == DEDICATED_SPI);
-  assert(spiConfig.maxSck == SD_SCK_MHZ(50));
+  if (began) { throw std::invalid_argument("Already began"); }
+  if (spiConfig.csPin != 17) { throw std::invalid_argument("Unsupport csPin"); }
+  if (spiConfig.options != DEDICATED_SPI) { throw std::invalid_argument("Unsupported options"); }
+  if (spiConfig.maxSck != SD_SCK_MHZ(50)) { throw std::invalid_argument("Unsupported maxSck"); }
 
   began = true;
   return true;
 }
 
 bool SdFs::mkdir(const String &path_str, bool pFlag) {
-  assert(began);
+  if (!began) { throw std::invalid_argument("Already began"); }
 
   std::filesystem::path path(path_str.c_str());
 
@@ -62,7 +62,7 @@ bool SdFs::mkdir(const std::filesystem::path &path, bool pFlag) {
 }
 
 bool SdFs::exists(const String &path_str) const {
-  assert(began);
+  if (!began) { throw std::invalid_argument("Already began"); }
 
   std::filesystem::path path(path_str.c_str());
 
@@ -74,7 +74,7 @@ bool SdFs::exists(const std::filesystem::path &path) const {
 }
 
 FsFile SdFs::open(const String &path_str, oflag_t oflag) {
-  assert(began);
+  if (!began) { throw std::invalid_argument("Already began"); }
 
   // Currently files are only writable
   if (!(oflag & O_WRONLY)) {

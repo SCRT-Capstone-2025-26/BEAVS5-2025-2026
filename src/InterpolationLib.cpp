@@ -114,15 +114,15 @@ double Interpolation::CatmullSpline(double xValues[], double yValues[], int numV
 	}
 	else
 	{
-		m0 = catmullSlope(xValues, yValues, numValues, i);
-		m1 = catmullSlope(xValues, yValues, numValues, i + 1);
+		m0 = catmullSlope(xValues, yValues, i);
+		m1 = catmullSlope(xValues, yValues, i + 1);
 	}
 
 	auto rst = h00 * y0 + h01 * y1 + h10 * (x1 - x0) * m0 + h11 * (x1 - x0) * m1;
 	return rst;
 }
 
-double Interpolation::catmullSlope(double x[], double y[], int n, int i)
+double Interpolation::catmullSlope(double x[], double y[], int i)
 {
 	if (x[i + 1] == x[i - 1]) return 0;
 	return (y[i + 1] - y[i - 1]) / (x[i + 1] - x[i - 1]);

@@ -1,3 +1,4 @@
+
 #include <Adafruit_BMP3XX.h>
 #include <Adafruit_BNO055.h>
 #include <Adafruit_Sensor.h>
@@ -9,17 +10,23 @@
 #include <deque>
 #include <cmath>
 
+
+// TODO: Consider changing the compiler warnings on this file
+
 // The string addition feels wrong, but it seems right
 // This code will not handle rollovers for millis() (~49.7 days), but will for
 // micros() (~71.5 minutes)
 
-typedef struct {
+typedef struct Event {
   unsigned long time;
   String message;
+
+  Event(unsigned long time, String message) : time(time), message(message) {
+  }
 } Event;
 
 // Spinlocks are not very efficient and should be used sparingly on quick operations
-typedef class {
+typedef class Spinlock {
 private:
     std::atomic_flag flag = ATOMIC_FLAG_INIT;
 
@@ -132,7 +139,7 @@ void write_log(const Event &event) {
 }
 
 void write_log(const String &string) {
-  write_log((Event){.time = millis(), .message = string});
+  write_log(Event(millis(), string));
 }
 
 // serial_now should only be true in core2
@@ -141,9 +148,9 @@ void push_event(String &&message) {
 
   if (events.size() == MAX_EVENTS) {
     // Maybe don't replace if there was already an overflow
-    events.front() = (Event){.time = millis(), .message = "Event overflow"};
+    events.front() = Event(millis(), "Event overflow");
   } else {
-    events.push_front((Event){.time = millis(), .message = message});
+    events.push_front(Event(millis(), message));
   }
 
   events_lock.unlock();
@@ -460,6 +467,10 @@ void loop() {
   case MISC:
     task_timers[MISC] += MISC_DELAY;
     break;
+  // Should never happen (only to appease warnings)
+  case TASK_COUNT:
+    push_event("Illegal Task");
+    break;
   }
 
   run_state();
@@ -468,11 +479,11 @@ void loop() {
 
 void loop1() {
   if (sd_inited) {
-    String entry = String(millis()) + ',' + servo_pwm.load();
+    String entry = String(millis()) + String(',') + servo_pwm.load();
     data_file.println(entry);
   }
 
-  Event event;
+  Event event(0, "Null");
   while (pop_event(event)) {
     write_log(event);
   }
