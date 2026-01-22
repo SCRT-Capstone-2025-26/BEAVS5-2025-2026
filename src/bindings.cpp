@@ -20,9 +20,7 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
       });
 
   pybind11::class_<SdFs>(mod, "SDFS")
-      .def("get_file", [](const SdFs &fs, const std::string &path_str) {
-        std::filesystem::path path(path_str.c_str());
-
+      .def("get_file", [](const SdFs &fs, const std::string &path) {
         if (!fs.files_s.contains(path)) {
           return std::optional<pybind11::bytes>();
         }
