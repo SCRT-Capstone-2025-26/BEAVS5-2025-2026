@@ -31,10 +31,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        pr: ${{ github.event_name == 'pull_request' }} # Maybe || github.ref_name == 'main'
+        pr:
+          - ${{ github.event_name == 'pull_request' }} # Maybe || github.ref_name == 'main'
         python-version: ["3.12"]
         exclude:
-          - os: macos-latex
+          - os: macos-latest
             pr: false
           - os: windows-latest
             pr: false
