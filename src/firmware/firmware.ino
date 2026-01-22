@@ -407,8 +407,8 @@ void setup1() {
       }
 
       sd_inited = true;
-      log_file = sd.open(log_path, O_CREAT | O_WRITE | O_APPEND);
-      data_file = sd.open(data_path, O_CREAT | O_WRITE | O_APPEND);
+      log_file = sd.open(log_path, (oflag_t)(O_CREAT | O_WRITE | O_APPEND));
+      data_file = sd.open(data_path, (oflag_t)(O_CREAT | O_WRITE | O_APPEND));
       data_file.println("time,altitude");
 
       write_log("Files " + String(i) + " created");

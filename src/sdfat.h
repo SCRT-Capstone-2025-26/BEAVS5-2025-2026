@@ -10,10 +10,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#define O_RDONLY ((oflag_t)0X00)
-#define O_WRONLY ((oflag_t)0X01)
-#define O_APPEND ((oflag_t)0X08)
-#define O_CREAT ((oflag_t)0X10)
+#define O_RDONLY 0X00
+#define O_WRONLY 0X01
+#define O_APPEND 0X08
+#define O_CREAT 0x10
 #define O_WRITE O_WRONLY
 
 #define SD_SCK_MHZ(maxMhz) (1000000UL * (maxMhz))
