@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(MyPackage LANGUAGES CXX)
+project(beavs_sim LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -36,7 +36,7 @@ FetchContent_Declare(
 )
 
 set(BOOST_ENABLE_CMAKE ON)
-set(BOOST_INCLUDE_LIBRARIES system context)
+set(BOOST_INCLUDE_LIBRARIES system context coroutine2)
 
 FetchContent_MakeAvailable(boost)
 
@@ -58,6 +58,7 @@ target_include_directories(beavs_sim PRIVATE
 target_link_libraries(beavs_sim PRIVATE
     Boost::system
     Boost::context
+    Boost::coroutine2
 )
 
 check_linker_flag(CXX "-latomic" CXX_LINKS_ATOMIC)
