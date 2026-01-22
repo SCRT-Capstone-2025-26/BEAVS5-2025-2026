@@ -1,8 +1,5 @@
 /.vscode
 
-pyrightconfig.json
-compile_commands.json
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

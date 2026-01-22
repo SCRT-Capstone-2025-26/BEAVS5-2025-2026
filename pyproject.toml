@@ -12,9 +12,6 @@ dependencies = []
 [project.optional-dependencies]
 test = ["pytest", "parse", "matplotlib", "bayesian-optimization"]
 
-[tool.setuptools]
-packages = ["src"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
