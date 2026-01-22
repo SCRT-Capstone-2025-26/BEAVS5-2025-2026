@@ -48,7 +48,7 @@ bool Adafruit_BMP3XX::setPressureOversampling(uint8_t os) {
 
 bool Adafruit_BMP3XX::setIIRFilterCoeff(uint8_t fs) {
   if (!began) { throw std::invalid_argument("Hasn't began"); }
-  if (fs != BMP3_OVERSAMPLING_16X) { throw std::invalid_argument("Unsupported fs"); }
+  if (fs != BMP3_IIR_FILTER_COEFF_3) { throw std::invalid_argument("Unsupported fs"); }
 
   return true;
 }
