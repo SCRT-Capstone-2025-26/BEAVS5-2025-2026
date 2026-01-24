@@ -1,15 +1,4 @@
 /.vscode
-Arduino/*.o
-Arduino/*.d
-Arduino/.cache
-Arduino/sim.so
-Arduino/.buildflags.txt
-Arduino/.deps
-Arduino/board.cpp
-Arduino/board.h
-
-pyrightconfig.json
-compile_commands.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

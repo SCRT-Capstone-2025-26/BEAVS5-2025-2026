@@ -1,0 +1,17 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11", "tree-sitter", "tree-sitter-cpp"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "beavs_sim"
+version = "0.0.1"
+description = "Firmware and simulation for Beavs5"
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest", "parse", "matplotlib", "bayesian-optimization"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"

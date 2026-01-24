@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
+#include <stdexcept>
 
 #include "bmp.h"
 #include "bno.h"
@@ -19,9 +20,7 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
       });
 
   pybind11::class_<SdFs>(mod, "SDFS")
-      .def("get_file", [](const SdFs &fs, const std::string &path_str) {
-        std::filesystem::path path(path_str.c_str());
-
+      .def("get_file", [](const SdFs &fs, const std::string &path) {
         if (!fs.files_s.contains(path)) {
           return std::optional<pybind11::bytes>();
         }
@@ -88,16 +87,15 @@ PYBIND11_MODULE(beavs_sim, mod, pybind11::mod_gil_not_used()) {
       .def("step", &Sim_s::step)
       .def("set_pin",
            [](Sim_s &sim, uint8_t pin, bool value) {
-             assert(pin < pin_count_s);
-             assert(value == LOW || value == HIGH);
-             assert(sim.pins_s[pin].mode == INPUT);
+             if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
+             if (sim.pins_s[pin].mode != INPUT) { throw std::invalid_argument("Pin not in INPUT mode"); }
 
              sim.pins_s[pin].value = value;
            })
       .def("get_pin",
            [](Sim_s &sim, uint8_t pin, bool analog) {
-             assert(pin < pin_count_s);
-             assert(analog || sim.pins_s[pin].mode == OUTPUT);
+             if (pin >= pin_count_s) { throw std::invalid_argument("Index out of range"); }
+             if (!analog && sim.pins_s[pin].mode != OUTPUT) { throw std::invalid_argument("Pin not in OUTPUT mode"); }
 
              return sim.pins_s[pin].value;
            })

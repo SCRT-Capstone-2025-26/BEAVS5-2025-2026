@@ -1,8 +1,8 @@
 #include "sdfat.h"
+#include "misc.h"
 
 #include <cassert>
 #include <cstddef>
-#include <filesystem>
 #include <memory>
 #include <unordered_map>
 
@@ -26,31 +26,28 @@ bool FsFile::close() {
 }
 
 bool SdFs::begin(SdSpiConfig spiConfig) {
-  assert(!began);
-  assert(spiConfig.csPin == 17);
-  assert(spiConfig.options == DEDICATED_SPI);
-  assert(spiConfig.maxSck == SD_SCK_MHZ(50));
+  if (began) { throw std::invalid_argument("Already began"); }
+  if (spiConfig.csPin != 17) { throw std::invalid_argument("Unsupport csPin"); }
+  if (spiConfig.options != DEDICATED_SPI) { throw std::invalid_argument("Unsupported options"); }
+  if (spiConfig.maxSck != SD_SCK_MHZ(50)) { throw std::invalid_argument("Unsupported maxSck"); }
 
   began = true;
   return true;
 }
 
-bool SdFs::mkdir(const String &path_str, bool pFlag) {
-  assert(began);
+bool SdFs::mkdir(const String &path, bool pFlag) {
+  if (!began) { throw std::invalid_argument("Already began"); }
+  if (path.length() != 0 && (path[path.length() - 1] == '/' || path[0] == '/')) { throw std::invalid_argument("Can't handle ending or leading /"); }
 
-  std::filesystem::path path(path_str.c_str());
-
-  return mkdir(path, pFlag);
-}
-
-bool SdFs::mkdir(const std::filesystem::path &path, bool pFlag) {
   if (exists(path)) {
     return false;
   }
 
-  if (path.has_parent_path()) {
-    if (!dirs.contains(path.parent_path())) {
-      if (!pFlag || !mkdir(path.parent_path(), true)) {
+  int index = path.find_last_of('/');
+  if (index != -1) {
+    String parent = path.substr(0, index);
+    if (!dirs.contains(parent)) {
+      if (!pFlag || !mkdir(parent, true)) {
         return false;
       }
     }
@@ -61,27 +58,19 @@ bool SdFs::mkdir(const std::filesystem::path &path, bool pFlag) {
   return true;
 }
 
-bool SdFs::exists(const String &path_str) const {
-  assert(began);
+bool SdFs::exists(const String &path) const {
+  if (!began) { throw std::invalid_argument("Already began"); }
 
-  std::filesystem::path path(path_str.c_str());
-
-  return exists(path);
-}
-
-bool SdFs::exists(const std::filesystem::path &path) const {
   return dirs.contains(path) || files_s.contains(path);
 }
 
-FsFile SdFs::open(const String &path_str, oflag_t oflag) {
-  assert(began);
+FsFile SdFs::open(const String &path, oflag_t oflag) {
+  if (!began) { throw std::invalid_argument("Already began"); }
 
   // Currently files are only writable
   if (!(oflag & O_WRONLY)) {
     return FsFile();
   }
-
-  std::filesystem::path path(path_str.c_str());
 
   if (dirs.contains(path)) {
     return FsFile();

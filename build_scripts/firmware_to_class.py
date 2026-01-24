@@ -3,18 +3,19 @@ import tree_sitter_cpp as tscpp
 import argparse
 import os
 
-
 def get_function(node, name):
     for child in node.children:
-        if child.type == "primitive_type" or child.type == "type_identifier":
+        if child.type == 'primitive_type' or child.type == 'type_identifier':
             type_node = child
-        elif child.type == "function_declarator":
+        elif child.type == 'function_declarator':
             decl_node = child
-        elif child.type == "compound_statement":
+        elif child.type == 'compound_statement':
             stmt_node = child
 
-    decl = b"%s %s;" % (type_node.text, decl_node.text)
-    defi = b"%s %s::%s %s" % (type_node.text, name, decl_node.text, stmt_node.text)
+    type_str = type_node.text.decode('utf-8')
+    decl_str = decl_node.text.decode('utf-8')
+    decl = '%s %s;' % (type_str, decl_str)
+    defi = '%s %s::%s %s' % (type_str, name, decl_str, stmt_node.text.decode('utf-8'))
 
     return decl, defi
 
@@ -22,12 +23,12 @@ def get_function(node, name):
 def get_declaration(node):
     children = []
     for child in node.children:
-        if child.type == "type_qualifier" and child.text == b"const":
+        if child.type == 'type_qualifier' and child.text == b'const':
             continue
 
-        children.append(child.text)
+        children.append(child.text.decode('utf-8'))
 
-    return b" ".join(children)
+    return ' '.join(children)
 
 
 def read_decls(node, name):
@@ -40,33 +41,33 @@ def read_decls(node, name):
     # This doesn't handle everything
     # It doesn't put anything in out_class even though for example a "using std::atan;" or function declarations
     for child in node.children:
-        if child.type == "function_definition":
+        if child.type == 'function_definition':
             decl, defi = get_function(child, name)
             in_class.append(decl)
             source.append(defi)
-        elif child.type == "declaration":
+        elif child.type == 'declaration':
             in_class.append(get_declaration(child))
-        elif child.type == "type_definition":
-            out_class.append(b"%s" % (child.text))
-        elif child.type == "enum_specifier":
-            in_class.append(b"%s;" % (child.text))
-        elif child.type == "preproc_def":
-            preprocs.append(b"%s" % (child.text))
+        elif child.type == 'type_definition':
+            out_class.append(child.text.decode('utf-8'))
+        elif child.type == 'enum_specifier':
+            in_class.append('%s;' % (child.text.decode('utf-8')))
+        elif child.type == 'preproc_def':
+            preprocs.append(child.text.decode('utf-8'))
 
     return preprocs + out_class, in_class, source
 
 
 def make_class(in_class, name, adds):
-    body = b"\n  ".join(in_class)
-    return b"class %s {\npublic:\n%s\n  %s\n};" % (name, adds, body)
+    body = '\n  '.join(in_class)
+    return 'class %s {\npublic:\n%s\n  %s\n};' % (name, adds, body)
 
 
 def make_header(out_class, in_class, name, out_adds, in_adds):
     clazz = make_class(in_class, name, in_adds)
-    head = b"\n".join(out_class)
+    head = '\n'.join(out_class)
 
-    caps_name = "".join(c.upper() for c in name.decode("utf-8")).encode("utf-8")
-    return b"#ifndef %s_H\n#define %s_H\n\n%s\n%s\n\n%s\n\n#endif\n" % (
+    caps_name = ''.join(c.upper() for c in name)
+    return '#ifndef %s_H\n#define %s_H\n\n%s\n%s\n\n%s\n\n#endif\n' % (
         caps_name,
         caps_name,
         out_adds,
@@ -76,70 +77,69 @@ def make_header(out_class, in_class, name, out_adds, in_adds):
 
 
 def make_source(source, header_name, adds):
-    defis = b"\n\n".join(source)
+    defis = '\n\n'.join(source)
 
-    return b'#include "%s"\n\n%s\n%s\n' % (header_name, adds, defis)
+    return '#include "%s"\n\n%s\n%s\n' % (header_name, adds, defis)
 
 
 # This is for the makefile
 def replace(path, content):
     if os.path.exists(path):
-        with open(path, 'rb') as file:
+        with open(path, 'r') as file:
             if file.read() == content:
                 return
 
-    with open(path, "wb+") as file:
+    with open(path, 'w+') as file:
         file.write(content)
 
 
 # TODO: Use extern in the header file so compilation is faster
 # TODO: Maybe add implicit array sizes
 def classify_file(in_path, out_path, additions_path, name):
-    name = name.encode("utf-8")
-    with open(additions_path, "rb") as file:
+    with open(additions_path, 'r') as file:
         text = file.read()
-        out_adds, in_adds, source_adds = text.split(b"\n------\n\n")
+        out_adds, in_adds, source_adds = text.split('\n------\n\n')
 
-    with open(in_path, "rb") as file:
+    with open(in_path, 'r') as file:
         code = file.read()
 
     parser = ts.Parser(ts.Language(tscpp.language()))
 
-    tree = parser.parse(code)
+    tree = parser.parse(code.encode())
     root = tree.root_node
 
     out_class, in_class, source = read_decls(root, name)
 
-    header_path = "%s.h" % out_path
-    source_path = "%s.cpp" % out_path
+    header_path = '%s.h' % out_path
+    source_path = '%s.cpp' % out_path
 
     header_text = make_header(out_class, in_class, name, out_adds, in_adds)
     source_text = make_source(
-        source, os.path.basename(header_path).encode("utf-8"), source_adds
+        source, os.path.basename(header_path), source_adds
     )
 
     replace(header_path, header_text)
     replace(source_path, source_text)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("in_path", type=str, help="The input file path as a string.")
+    parser.add_argument('in_path', type=str, help='The input file path as a string.')
 
     parser.add_argument(
-        "additions_path",
+        'additions_path',
         type=str,
-        help="The includes file path as a string.",
+        help='The includes file path as a string.',
     )
 
     parser.add_argument(
-        "out_path",
+        'out_path',
         type=str,
-        help="The output file path (no extension) as a string.",
+        help='The output file path (no extension) as a string.',
     )
 
-    parser.add_argument("name", type=str, help="The class name.")
+    parser.add_argument('name', type=str, help='The class name.')
 
     args = parser.parse_args()
     classify_file(args.in_path, args.out_path, args.additions_path, args.name)

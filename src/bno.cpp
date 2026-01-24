@@ -2,18 +2,18 @@
 
 #include "wire.h"
 #include <cassert>
+#include <stdexcept>
 
-Adafruit_BNO055::Adafruit_BNO055(int32_t sensorID, uint8_t address,
-                                 TwoWire *theWire) {
-  assert(!began);
-  assert(sensorID == 55);
-  assert(address == 0x28);
+Adafruit_BNO055::Adafruit_BNO055(int32_t sensorID, uint8_t address, TwoWire *theWire) {
+  if (began) { throw std::invalid_argument("Already began"); }
+  if (sensorID != 55) { throw std::invalid_argument("Unsupported sensorID"); }
+  if (address != 0x28) { throw std::invalid_argument("Unsupported address"); }
 
   wire = theWire;
 }
 
 bool Adafruit_BNO055::begin() {
-  assert(wire->began_s());
+  if (!wire->began_s()) { throw std::invalid_argument("Wire hasn't began"); }
 
   began = true;
 
@@ -21,15 +21,15 @@ bool Adafruit_BNO055::begin() {
 }
 
 void Adafruit_BNO055::setExtCrystalUse(bool usextal) {
-  assert(began);
+  if (!began) { throw std::invalid_argument("Hasn't began"); }
 
   extCrystal = usextal;
 }
 
 bool Adafruit_BNO055::getEvent(sensors_event_t *event,
                                adafruit_vector_type_t type) {
-  assert(began);
-  assert(extCrystal);
+  if (!began) { throw std::invalid_argument("Hasn't began"); }
+  if (!extCrystal) { throw std::invalid_argument("Ext crystal not set"); }
 
   switch (type) {
   case VECTOR_LINEARACCEL:

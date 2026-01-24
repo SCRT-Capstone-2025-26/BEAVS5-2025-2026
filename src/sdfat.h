@@ -3,10 +3,10 @@
 
 #include "misc.h"
 #include <cstddef>
-#include <filesystem>
 #include <memory>
 #include <sstream>
 #include <stdint.h>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -40,7 +40,7 @@ struct File_s {
   std::stringstream content;
 };
 
-// Less restrictive than normal FAT file
+// Less restrictive than normal FAT file and may not be a perfect or even good virtual filesystem
 class FsFile {
 private:
   FsFile(std::shared_ptr<File_s> file) : file_s(file) {}
@@ -57,18 +57,15 @@ public:
   friend class SdFs;
 };
 
-// Less restrictive than normal FAT
+// Less restrictive than normal FAT and may not be a perfect or even good virtual filesystem
 class SdFs {
 private:
   bool began = false;
 
-  std::unordered_set<std::filesystem::path> dirs;
-
-  bool mkdir(const std::filesystem::path &path, bool pFlag);
-  bool exists(const std::filesystem::path &path) const;
+  std::unordered_set<std::string> dirs;
 
 public:
-  std::unordered_map<std::filesystem::path, std::shared_ptr<File_s>> files_s;
+  std::unordered_map<std::string, std::shared_ptr<File_s>> files_s;
 
   bool begin(SdSpiConfig spiConfig);
 
