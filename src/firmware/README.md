@@ -9,3 +9,4 @@ arduino project and has the following dependencies. Since the hardware is changi
 these will likely change. It is currently under development.
 
 - <https://github.com/UravuLabs/MS5607> (1.1)
+- <https://github.com/stm32duino/ISM6HG256X> (2.0.0)
