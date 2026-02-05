@@ -19,10 +19,9 @@ FlightState flight_state;
 RestState rest_state;
 
 MS5611_SPI baro(BAROMETER_CS, &SPI);
-ISM6HG256XSensor acc(&SPI, IMU_CS);
+ISM6HG256XSensor imu(&SPI, IMU_CS);
 
 // NOTE: Init values are temporary and will be determined by data later
-// TODO: Add error handling
 void setup() {
   SPI.setRX(SPI_MISO);
   SPI.setTX(SPI_MOSI);
@@ -32,15 +31,15 @@ void setup() {
   baro.begin();
   baro.setOversampling(OSR_ULTRA_HIGH);
 
-  acc.begin();
+  imu.begin();
 
-  acc.Enable_HG_X();
-  acc.Enable_X();
-  acc.Enable_G();
+  imu.Enable_HG_X();
+  imu.Enable_X();
+  imu.Enable_G();
 
-  acc.Set_X_OutputDataRate_With_Mode(ISM6HG256X_ACC_SENSITIVITY_FS_16G, ISM6HG256X_ACC_HIGH_ACCURACY_ODR_MODE);
-  acc.Set_HG_X_OutputDataRate(ISM6HG256X_ACC_SENSITIVITY_FS_256G);
-  acc.Set_G_OutputDataRate_With_Mode(ISM6HG256X_GYRO_SENSITIVITY_FS_4000DPS, ISM6HG256X_GYRO_HIGH_ACCURACY_ODR_MODE);
+  imu.Set_X_OutputDataRate_With_Mode(ISM6HG256X_ACC_SENSITIVITY_FS_16G, ISM6HG256X_ACC_HIGH_ACCURACY_ODR_MODE);
+  imu.Set_HG_X_OutputDataRate(ISM6HG256X_ACC_SENSITIVITY_FS_256G);
+  imu.Set_G_OutputDataRate_With_Mode(ISM6HG256X_GYRO_SENSITIVITY_FS_4000DPS, ISM6HG256X_GYRO_HIGH_ACCURACY_ODR_MODE);
 
   board_mode = UNARMED;
 
@@ -56,7 +55,7 @@ void loop() {
   }
 
   sample_baro();
-  sample_acc();
+  sample_imu();
 
   update_mode();
 
@@ -82,7 +81,7 @@ void update_mode() {
 }
 
 void do_failure() {
-
+  
 }
 
 // TODO: Check self heating mentioned for similar product in MS5xxx library docs
@@ -100,14 +99,19 @@ void sample_baro() {
 }
 
 // TODO: Add error handling
-void sample_acc() {
+void sample_imu() {
   ISM6HG256X_Axes_t acc_axis;
+  ISM6HG256X_Axes_t acc_hg_axis;
   ISM6HG256X_Axes_t gyro_axis;
 
+  imu.Get_X_Axes(acc_axis);
+  imu.Get_X_HG_Axes(acc_hg_axis);
+  imu.Get_G_Axes(gyro_axis);
+
   if (board_mode == FLYING) {
-    flight_state.push_acc(acc_axis, gyro_axis);
+    flight_state.push_imu(imu_axis, gyro_axis);
   } else if (board_mode == UNARMED || board_mode == ARMED) {
-    rest_state.push_acc(acc_axis, gyro_axis);
+    rest_state.push_imu(imu_axis, gyro_axis);
   }
 }
 
