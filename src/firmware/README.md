@@ -1,14 +1,16 @@
 # BEAVS5 Firmware
 
+## NOTE: This is currently under development for the new board
+
 ## Overview
 
 This contains the actual firmware the will run on the BEAVS5 system. It is an
-arduino project and has the following dependencies. Since the hardware is changing
-these will likely change. It is currently under development.
+arduino project and has the following dependencies on a generic rp2040 board.
 
-- Adafruit BMP3XX Library (**2.1.6**)
-- Adafruit BNO055 Library (**1.6.4**)
-- Adafruit BusIO (**1.17.4**)
-- Adafruit Unified Sensor (**1.1.15**)
-- InterpolationLib (**1.0.2**)
-- SdFat (**2.3.0** this is and outdated version as the latest seems to have a conflict with Arduino.h)
+-
+
+See <https://github.com/osu-asdt/beavs-6> for more details about the hardware.
+
+## Notes
+
+- The rp2040 has two cores. All logging and stuff is on core 1 and the rest is on core 0.

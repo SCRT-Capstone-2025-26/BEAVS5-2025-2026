@@ -1,5 +1,7 @@
 # BEAVS5 Firmware and Simulation
 
+## NOTE: Currently the firmware simulation is in progress to work with the new board
+
 ## Overview
 
 This is the repo for SCRT's beavs module. Which is designed to extend servo
