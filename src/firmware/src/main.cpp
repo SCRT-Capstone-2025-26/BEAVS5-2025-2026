@@ -136,7 +136,7 @@ void setup() {
   bool sd_failure = wait_log_boot();
   // If there is an SD failure mark that (it is not critical though).
   // Since the function returned the other core has booted and we can continue
-  log_message("Log core booted")
+  log_message("Log core booted");
   if (!sd_failure) { log_message("SD inited"); }
   leds[LED_SD] = sd_failure ? LED_NEGATIVE : LED_POSITIVE;
   led_show();

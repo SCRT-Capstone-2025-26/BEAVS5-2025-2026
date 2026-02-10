@@ -1,6 +1,6 @@
 #include <atomic>
 #include <SdFat.h>
-#include <optional>
+#include <pico/platform.h>
 // TODO: Possibly add radio
 
 #include "logging.h"
@@ -32,6 +32,7 @@ FsFile data_file;
 // This is a class to put logs in the queue from the main core
 struct LogEvent {
   Millis timestamp;
+  int core;
   // TODO: Variant
   Message value;
 };
@@ -47,6 +48,7 @@ std::atomic_bool event_write_fail;
 void log_message(Message &&content) {
   LogEvent event;
   event.timestamp = millis();
+  event.core = get_core_num();
   event.value = content;
 
   if (!events.putQ(event)) {
@@ -67,6 +69,7 @@ bool wait_log_boot() {
 void setup1() {
   // Init the serial
   Serial.begin(115200);
+  Serial.println("Serial");
   log_message("Serial inited");
 
   // Try to init the file we just assume that the file is not inited
@@ -99,6 +102,7 @@ void setup1() {
 
       // Init the csv header
       data_file.println("time,altitude");
+      data_file.flush();
 
       // We have created log files
       file_inited = true;
@@ -114,15 +118,18 @@ void setup1() {
 }
 
 // Actually write the log to the serial and file if available
-void write_log(String &content) {
+// This could be optimized to prevent copying maybe
+void write_log(String content) {
   if (!sd_failure) {
     log_file.println(content);
+    log_file.flush();
   }
 
   Serial.println(content);
 }
 
 // Handles a log event converting it into something usable
+// This could probably be optimized quite a bit because of the string concat and copying
 void handle_event(LogEvent &event) {
   // Convert the log data into a human readable string
   String content = match(event.value,
@@ -131,7 +138,7 @@ void handle_event(LogEvent &event) {
 
   // For some reason the Arduino examples use this string adding
   // So I guess this is idiomatic
-  write_log("[" + String(event.timestamp) + "] " + content);
+  write_log("[time: " + String(event.timestamp) + "ms, core: " + String(event.core) + "] " + content);
 }
 
 // Just empties the log queue
@@ -142,7 +149,7 @@ void loop1() {
     handle_event(event);
 
     if (event_write_fail) {
-      write_log("Log buffer full.")
+      write_log("Log buffer full.");
     }
   }
 }

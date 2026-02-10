@@ -39,7 +39,7 @@ class EventQueue{
 
 public:
     EventQueue(): _in(0), _out(0), _count(0), _s(s) {
-        sem_init(&_rw_sem, 0, 1);
+        sem_init(&_rw_sem, 1, 1);
         sem_init(&_count_sem, 0, s);
     }
 
@@ -70,6 +70,7 @@ public:
         bool rc = false;
 
         sem_acquire_blocking(&_rw_sem);
+
         if (_count < _s){
             _count++;
             sem_release(&_count_sem);

@@ -5,7 +5,7 @@
 
 typedef std::variant<String> Message;
 
-void log_message(Message &content);
+void log_message(Message &&content);
 
 bool wait_log_boot();
 
