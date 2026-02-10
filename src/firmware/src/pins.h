@@ -1,7 +1,5 @@
-#ifndef DEFS_H
-#define DEFS_H
-
-typedef unsigned long Millis;
+#ifndef PINS_H
+#define PINS_H
 
 #define LEVELSHIFT_DIR         3
 #define ARM_SWITCH             6

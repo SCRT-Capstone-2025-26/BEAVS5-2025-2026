@@ -1,0 +1,149 @@
+#include <atomic>
+#include <SdFat.h>
+#include <optional>
+// TODO: Possibly add radio
+
+#include "logging.h"
+#include "eventqueue.h"
+#include "pins.h"
+#include "util.h"
+
+// This file handles the code that runs on the other core and handles the logging for Beavs
+
+// See https://stackoverflow.com/questions/64017982/c-equivalent-of-rust-enums
+// This allows rust like enums with the c++ variant
+// https://en.cppreference.com/w/cpp/utility/variant/visit
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+// explicit deduction guide (not needed as of C++20)
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+template <typename Val, typename... Ts>
+auto match(Val &&val, Ts... ts) {
+    return std::visit(overloaded{std::forward<Ts>(ts)...}, std::forward<Val>(val));
+}
+
+std::atomic_bool log_booted(false);
+std::atomic<bool> sd_failure;
+
+SdFs sd;
+FsFile log_file;
+FsFile data_file;
+
+// This is a class to put logs in the queue from the main core
+struct LogEvent {
+  Millis timestamp;
+  // TODO: Variant
+  Message value;
+};
+
+// This is thread safe to store the events put in the queue
+// Should be big enough for boot events to build up before being cleared
+EventQueue<LogEvent, 64> events;
+// Is set to time if there is a log and events is full
+// If there are two fails only one is guarranteed to work
+std::atomic_bool event_write_fail;
+
+// This can be called from either core and is the main logging functionality
+void log_message(Message &&content) {
+  LogEvent event;
+  event.timestamp = millis();
+  event.value = content;
+
+  if (!events.putQ(event)) {
+    // If we fail to write then we mark that
+    event_write_fail = true;
+  }
+}
+
+// This should be called from the other core to confirm that this core has booted
+// It returns when this core has booted and returns whether or not the SD is available
+bool wait_log_boot() {
+  // There are fancier ways, but it doesn't matter since this should be a short wait
+  while (!log_booted) { delay(1); }
+
+  return sd_failure;
+}
+
+void setup1() {
+  // Init the serial
+  Serial.begin(115200);
+  log_message("Serial inited");
+
+  // Try to init the file we just assume that the file is not inited
+  //  until the files are created and written to
+  bool file_inited = false;
+  // Check if we can access the sd
+  // TODO: There is probably some errors that are not being checked (like the returns from mkdir)
+  if (sd.begin(SdioConfig(SD_CLOCK, SD_CMD, SD_DATA_0))) {
+    log_message("SD inited");
+
+    // Create the log folders if they don't already exist
+    sd.mkdir("Logs");
+    sd.mkdir("Data");
+
+    // Try to create the log files we just search for the first two files with an available name
+    //  by incrementing the number in the name
+    for (int i = 0; i < INT_MAX; i++) {
+      String log_path = "Logs/log_" + String(i) + ".txt";
+      String data_path = "Data/data_" + String(i) + ".csv";
+      // Check that both are available continue the loop if not
+      if (sd.exists(log_path) || sd.exists(data_path)) {
+        continue;
+      }
+
+      log_message("File number " + String(i) + " found");
+
+      // Open the files
+      log_file = sd.open(log_path, (oflag_t)(O_CREAT | O_WRITE | O_APPEND));
+      data_file = sd.open(data_path, (oflag_t)(O_CREAT | O_WRITE | O_APPEND));
+
+      // Init the csv header
+      data_file.println("time,altitude");
+
+      // We have created log files
+      file_inited = true;
+      break;
+    }
+  } else {
+    log_message("SD init failed");
+  }
+
+  // If the file isn't inited then there is an SD failure
+  sd_failure = !file_inited;
+  log_booted = true;
+}
+
+// Actually write the log to the serial and file if available
+void write_log(String &content) {
+  if (!sd_failure) {
+    log_file.println(content);
+  }
+
+  Serial.println(content);
+}
+
+// Handles a log event converting it into something usable
+void handle_event(LogEvent &event) {
+  // Convert the log data into a human readable string
+  String content = match(event.value,
+    [](String str) { return str; }
+  );
+
+  // For some reason the Arduino examples use this string adding
+  // So I guess this is idiomatic
+  write_log("[" + String(event.timestamp) + "] " + content);
+}
+
+// Just empties the log queue
+void loop1() {
+  LogEvent event;
+  while (true) {
+    events.getQ(event, true);
+    handle_event(event);
+
+    if (event_write_fail) {
+      write_log("Log buffer full.")
+    }
+  }
+}
+
