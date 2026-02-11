@@ -69,7 +69,6 @@ bool wait_log_boot() {
 void setup1() {
   // Init the serial
   Serial.begin(115200);
-  Serial.println("Serial");
   log_message("Serial inited");
 
   // Try to init the file we just assume that the file is not inited

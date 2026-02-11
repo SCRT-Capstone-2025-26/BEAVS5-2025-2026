@@ -85,6 +85,7 @@ public:
     }
 
 private:
+    // Old stuff
     uint8_t _in;
     uint8_t _out;
     // This is the actual number of items in the queue
@@ -92,12 +93,16 @@ private:
     uint8_t _count;
     const    uint8_t _s;
     T       _queue[s];
+
     // New
+    // _rw_sem is a lock on the the structure
     semaphore_t _rw_sem;
-    // This holds the count - the number of threads about to read an element
-    //  it allows blocking reads to wait for an element to become available
-    //  if you can acquire this you can read an element from the queue and subtract count
-    //  once you have the rw lock
+    // _count_sem essentially represents the availablility to "claim" a read
+    // If you have this semaphore you are permitted to do a read if you don't you cannot
+    // This means that _count_sem must be less than ore equal to _count to prevent
+    // authorizing a read without enough values in the queue
+    // If no threads have "claimed" a read then this is equal to _count
+    // This allows a blocking acquire on this to function as a blocking read
     semaphore_t _count_sem;
 };
 

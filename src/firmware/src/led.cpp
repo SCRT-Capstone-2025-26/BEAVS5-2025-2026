@@ -3,7 +3,7 @@
 #include "led.h"
 #include "pins.h"
 
-// TODO: Investigate teh seemlingly needed sleeps
+// TODO: Investigate the seemlingly needed sleeps
 
 RGB leds[6];
 
