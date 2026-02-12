@@ -35,6 +35,12 @@ struct LogEvent {
   int core;
   // TODO: Variant
   Message value;
+
+  LogEvent(Millis timestamp, int core, Message value) : timestamp(timestamp), core(core), value(value) {
+  }
+
+  LogEvent() {
+  }
 };
 
 // This is thread safe to store the events put in the queue
@@ -46,12 +52,7 @@ std::atomic_bool event_write_fail;
 
 // This can be called from either core and is the main logging functionality
 void log_message(Message &&content) {
-  LogEvent event;
-  event.timestamp = millis();
-  event.core = get_core_num();
-  event.value = content;
-
-  if (!events.putQ(event)) {
+  if (!events.putQ(LogEvent(millis(), get_core_num(), content))) {
     // If we fail to write then we mark that
     event_write_fail = true;
   }
@@ -67,6 +68,11 @@ bool wait_log_boot() {
 }
 
 void setup1() {
+#ifdef DEBUG
+  // Allow some time for the serial to connect
+  log_message("DEBUG MODE");
+#endif
+
   // Init the serial
   Serial.begin(115200);
   log_message("Serial inited");
@@ -114,6 +120,11 @@ void setup1() {
   // If the file isn't inited then there is an SD failure
   sd_failure = !file_inited;
   log_booted = true;
+
+#ifdef DEBUG
+  // Allow some time for the serial to connect
+  delay(3000);
+#endif
 }
 
 // Actually write the log to the serial and file if available
@@ -132,7 +143,8 @@ void write_log(String content) {
 void handle_event(LogEvent &event) {
   // Convert the log data into a human readable string
   String content = match(event.value,
-    [](String str) { return str; }
+    [](String str) { return String(str); },
+    [](ModeChange change) { return String(modeToName[change.old] + " -> " + modeToName[change.next]); }
   );
 
   // For some reason the Arduino examples use this string adding
@@ -143,6 +155,7 @@ void handle_event(LogEvent &event) {
 // Just empties the log queue
 void loop1() {
   LogEvent event;
+
   while (true) {
     events.getQ(event, true);
     handle_event(event);

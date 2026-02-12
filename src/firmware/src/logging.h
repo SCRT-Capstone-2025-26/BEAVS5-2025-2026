@@ -3,7 +3,17 @@
 
 #include <variant>
 
-typedef std::variant<String> Message;
+#include "util.h"
+
+struct ModeChange {
+  BoardMode old;
+  BoardMode next;
+
+  ModeChange(BoardMode old, BoardMode next) : old(old), next(next) {
+  }
+};
+
+typedef std::variant<String, ModeChange> Message;
 
 void log_message(Message &&content);
 

@@ -2,6 +2,7 @@
 #include <SoftwareSPI.h>
 #include <MS5611_SPI.h>
 #include <SPI.h>
+#include <RP2040_PWM.h>
 
 #include "pins.h"
 #include "state.h"
@@ -9,18 +10,28 @@
 #include "led.h"
 #include "util.h"
 
+// TODO: Look into clock overflow
+// TODO: Look into gyro saturation
+// TODO: Look into pressure drop when hitting around mach numbers
+// TODO: Create a function to switch mode that logs the switches
+
 BoardMode board_mode = BOOTING;
-FlightState flight_state;
-RestState rest_state;
+FlightState flight_state = FlightState();
+RestState rest_state = RestState();
 
 // The pins aren't correctly assigned for hardware SPI on the board
 // I assume it is a mistake (?) so we have to use bit banging
 SoftwareSPI softSPI(SPI_SCK, SPI_MISO, SPI_MOSI);
 
-// Pressure drop when hitting around mach numbers
-// Data loss for possibly 1-2 seconds (has to be filtered)
 MS5611_SPI baro(BAROMETER_CS, &softSPI);
 ISM6HG256XSensor imu(&softSPI, IMU_CS);
+
+// The servo has an operating frequency of 50-300Hz
+RP2040_PWM servo(SERVO_1, 300, 0);
+
+// TODO: Handle wrap around
+Millis next_sample;
+Millis sample_rate = 100;
 
 void init_pins() {
   // Disable servo power on startup due to inrush
@@ -32,8 +43,10 @@ void init_pins() {
   pinMode(LEVELSHIFT_DIR, OUTPUT);
   digitalWrite(LEVELSHIFT_DIR, LOW);
 
+  // We only use servo 1 so that is the only one inited to be a pwm pin
+  // The others can just be 0
+  servo.setPWM();
   // No floating pins for levelshifter
-  pinMode(SERVO_1, OUTPUT);  digitalWrite(SERVO_1, LOW);
   pinMode(SERVO_2, OUTPUT);  digitalWrite(SERVO_2, LOW);
   pinMode(SERVO_3, OUTPUT);  digitalWrite(SERVO_3, LOW);
   pinMode(SERVO_4, OUTPUT);  digitalWrite(SERVO_4, LOW);
@@ -56,31 +69,31 @@ void init_pins() {
   digitalWrite(RADIO_CS, HIGH);
 }
 
+// The servo cannot be enabled before the capacitors charge
+void init_servo() {
+  // We could do 2000 - millis(), but it is safer not to
+  // Once we add booting in flight this may change
+  delay(2000);
+
+  digitalWrite(SERVO_POWER_ENABLE, HIGH);
+}
+
+void push_mode(BoardMode mode) {
+  log_message(ModeChange(board_mode, mode));
+  board_mode = mode;
+}
+
 void push_failure(LEDs failure_led) {
   leds[failure_led] = LED_NEGATIVE;
+  leds[LED_STATUS] = LED_NEGATIVE;
   led_show();
+
+  push_mode(FAILURE);
 }
 
 // NOTE: Init values are temporary and will be determined by data later
-// TODO: Check the boards current state instead of assuming it is one the ground and booting
+// TODO: Check the boards current state instead of assuming it is one the ground and booting (in case of power loss or watchdog)
 void setup() {
-  // Check where servo is
-  // Confirm on the ground
-  // Check Beavs open/closed
-  // Use accelerometer to establish coordinates
-  // No partial deployments? (real time trajectory)
-  // Reset clock when on land
-
-  // Account for reset during flight
-  // Account for gyro saturation (~11 rpms/~4000dps)
-  // Check SD card write rate
-
-  // Calibrate sensors after boot
-  // Expect to have setup run multiple times (Watchdoy timers)
-  // Arm switch deboucing if no hardware debouncing
-  // Don't set board_mode
-  // Graph out fault chart
-
   // Initialize the pins
   // This initializes the servo power pins which if improperly initialized can cause
   //  problems with the capacitors when charging
@@ -141,37 +154,48 @@ void setup() {
   leds[LED_SD] = sd_failure ? LED_NEGATIVE : LED_POSITIVE;
   led_show();
 
+  // init_servo();
+  // TODO: Prove/test servo works here
+
   // An sd_failure isn't critical so it is not included in this if
   if (baro_init && imu_init) {
     // The board is now ready to be armed
-    board_mode = UNARMED;
+    push_mode(UNARMED);
     leds[LED_STATUS] = LED_POSITIVE;
   } else {
     // The board has failed to init
-    board_mode = FAILURE;
+    push_mode(FAILURE);
     leds[LED_STATUS] = LED_POSITIVE;
   }
 
   led_show();
+
+  next_sample = millis();
 }
 
 // This is called every loop iteration and is responsible for managing the state transitions
 void update_mode() {
   switch (board_mode) {
     // TODO: Unarmed to armed transition
+    case UNARMED:
+      // NOTE: This is for testing
+      if (millis() > 8000) { push_mode(ARMED); }
+      break;
     case ARMED:
       // If the rest_state can init the flying state then it means that it has detected high acceleration
       //  and we are in flight
       if (rest_state.try_init_flying(flight_state)) {
-        board_mode = FLYING;
+        push_mode(FLYING);
       }
+      break;
     case FLYING:
       // If the flight_state decides that we are done (practically our angle is too high or we have timed out)
       if (flight_state.done()) {
-        board_mode = DONE;
+        push_mode(DONE);
       }
+      break;
     default:
-      board_mode = FAILURE;
+      push_failure(LED_STATUS);
       break;
   }
 }
@@ -186,20 +210,20 @@ void update_servo() {
 
 // TODO: Check self heating mentioned for similar product in MS5xxx library docs
 // TODO: Add error handling
-void sample_baro() {
+void sample_baro(Millis sample_rate) {
   baro.read();
   double temp = baro.getPressure();
   double pressure = baro.getTemperature();
 
   if (board_mode == FLYING) {
-    flight_state.push_baro(temp, pressure);
+    flight_state.push_baro(temp, pressure, sample_rate);
   } else if (board_mode == UNARMED || board_mode == ARMED) {
-    rest_state.push_baro(temp, pressure);
+    rest_state.push_baro(temp, pressure, sample_rate);
   }
 }
 
 // TODO: Add error handling
-void sample_imu() {
+void sample_imu(Millis sample_rate) {
   ISM6HG256X_Axes_t acc_axis;
   ISM6HG256X_Axes_t gyro_axis;
 
@@ -207,16 +231,16 @@ void sample_imu() {
   imu.Get_G_Axes(&gyro_axis);
 
   if (board_mode == FLYING) {
-    flight_state.push_imu(acc_axis, gyro_axis);
+    flight_state.push_imu(acc_axis, gyro_axis, sample_rate);
   } else if (board_mode == UNARMED || board_mode == ARMED) {
-    rest_state.push_imu(acc_axis, gyro_axis);
+    rest_state.push_imu(acc_axis, gyro_axis, sample_rate);
   }
 }
 
 // This handles what the board should do when it has reached a critical failure
 // TODO: One sensor fail may not be critical
 void do_failure() {
-  delay(100);
+  delay(1000);
 }
 
 void loop() {
@@ -227,14 +251,16 @@ void loop() {
   }
 
   // Sample the sensors (this updates the relevant state object)
-  sample_baro();
-  sample_imu();
+  sample_baro(sample_rate);
+  sample_imu(sample_rate);
 
   update_mode();
 
   // Update the servo based on the state object
   update_servo();
 
-  // TODO: Some amount of time that is correct and based on the current time to reduce drift
-  delay(1);
+  next_sample += sample_rate;
+  Millis curr = millis();
+  // Since millis is unsigned we have to check for overflow
+  if (curr <= next_sample) { delay(next_sample - curr); }
 }
