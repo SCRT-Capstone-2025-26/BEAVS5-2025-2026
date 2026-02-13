@@ -3,6 +3,27 @@
 
 #include "logging.h"
 
+void FlightState::push_baro(double pressure, double temperature, Millis sample_rate) {
+}
+
+void FlightState::push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate) {
+  // This is just simple integration (not even like trapezoidal)
+  // This will be changed
+
+  pos += vel * sample_rate;
+
+  Eigen::Vector3d acc_vec(acc.x, acc.y, acc.z);
+  vel += (rot * acc_vec) * sample_rate;
+
+  // See https://stackoverflow.com/questions/23503151/how-to-update-quaternion-based-on-3d-gyro-data
+  rot.coeffs() += 0.5 * sample_rate * (rot * Eigen::Quaterniond(0, gyro.x, gyro.y, gyro.z)).coeffs();
+  rot.normalize();
+}
+
+bool FlightState::done() {
+  return false;
+}
+
 void RestState::push_baro(double pressure, double temperature, Millis sample_rate) {
 }
 
@@ -31,6 +52,10 @@ bool RestState::try_init_flying(FlightState &state) {
   }
 
   if (abs(acceleration - gravity_acc) > 30) {
+    state.rot = rot;
+    state.vel = Eigen::Vector3d(0.0, 0.0, 0.0);
+    state.pos = Eigen::Vector3d(0.0, 0.0, 0.0);
+
     return true;
   }
 

@@ -11,18 +11,24 @@
 
 // Position is has y perpendicular to the ground
 
-class FlightState {
-public:
+// TODO: Currently the units are really dumb and should be converted
+
+struct FlightState {
+  Eigen::Quaterniond rot;
+  // Units in mg * ms
+  Eigen::Vector3d vel;
+  // Units in mg * ms * ms
+  Eigen::Vector3d pos;
+
   FlightState() {}
 
-  void push_baro(double pressure, double temperature, Millis sample_rate) {}
+  void push_baro(double pressure, double temperature, Millis sample_rate);
+  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate);
 
-  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate) {}
-
-  bool done() { return false; }
+  bool done();
 };
 
-class RestState {
+struct RestState {
   // There is a degree of freedom (roll I believe) since this is based
   // On the accelerometer originally so y is perpendicular to the ground
   // After applying this rotation to a sampled accelerometer reading
@@ -31,11 +37,9 @@ class RestState {
 
   bool inited = false;
 
-public:
   RestState() {}
 
   void push_baro(double pressure, double temperature, Millis sample_rate);
-
   void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate);
 
   // Returns true if the rocket is flying and inits the flight state to that

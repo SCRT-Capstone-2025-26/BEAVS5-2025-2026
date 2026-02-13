@@ -250,6 +250,9 @@ void loop() {
     return;
   }
 
+  log_message(String(flight_state.vel.x()) + " " + String(flight_state.vel.y()) + "" + String(flight_state.vel.z()));
+  log_message(String(flight_state.pos.x()) + " " + String(flight_state.pos.y()) + "" + String(flight_state.pos.z()));
+
   // Sample the sensors (this updates the relevant state object)
   sample_baro(sample_rate);
   sample_imu(sample_rate);

@@ -70,7 +70,7 @@ bool wait_log_boot() {
 void setup1() {
 #ifdef DEBUG
   // Allow some time for the serial to connect
-  log_message("DEBUG MODE");
+  log_message("DEBUG MODE ENABLED");
 #endif
 
   // Init the serial
@@ -117,14 +117,14 @@ void setup1() {
     log_message("SD init failed");
   }
 
+#ifdef DEBUG
+  // Allow some time for the serial monitor to connect
+  delay(3000);
+#endif
+
   // If the file isn't inited then there is an SD failure
   sd_failure = !file_inited;
   log_booted = true;
-
-#ifdef DEBUG
-  // Allow some time for the serial to connect
-  delay(3000);
-#endif
 }
 
 // Actually write the log to the serial and file if available
@@ -161,6 +161,9 @@ void loop1() {
     handle_event(event);
 
     if (event_write_fail) {
+      // Set this false first to catch more overflows
+      event_write_fail = false;
+
       write_log("Log buffer full.");
     }
   }

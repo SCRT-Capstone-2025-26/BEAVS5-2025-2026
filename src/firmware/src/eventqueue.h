@@ -34,7 +34,7 @@ SOFTWARE.
 /// Implement FIFO type queue that use array as ringbuffer
 /// to store messages.
 ///
-template <class T,uint8_t s=8>
+template <class T, uint8_t s=8>
 class EventQueue{
 
 public:
