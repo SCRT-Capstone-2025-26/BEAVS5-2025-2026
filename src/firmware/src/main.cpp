@@ -32,11 +32,11 @@ MS5611_SPI baro(BAROMETER_CS, &softSPI);
 ISM6HG256XSensor imu(&softSPI, IMU_CS);
 
 // The servo has an operating frequency of 50-300Hz
-RP2040_PWM servo(SERVO_1, 300, 0);
+RP2040_PWM servo(SERVO_1, (float)SERVO_FREQ, 0.0f);
 
 Millis next_sample;
 const Millis sample_rate_ms = 100;
-const double sample_rate_s = (double)sample_rate_ms / SECONDS_TO_MILLIS;
+const double sample_rate_s = sample_rate_ms / SECONDS_TO_MILLIS;
 
 void init_pins() {
   // Disable servo power on startup due to inrush
@@ -254,20 +254,35 @@ void update_mode() {
   }
 }
 
+// TODO: Handle errors
 void update_servo() {
   if (!servo_powered) {
     if (try_power_servo()) {
       log_message("Servo powered");
+    } else {
+      return;
     }
   }
 
-  if (board_mode == FLYING) {
-    // TODO: Set servo to something from flight_state
-  } else if (board_mode == UNARMED) {
-    // TODO: Demo servo working once with millis_in_mode
-  } else {
-    // TODO: Set servo to flush
+  // We should just let the servo be since we don't know if we are flying and
+  //  should leave it
+  if (board_mode == UNKNOWN) {
+    return;
   }
+
+  double duty_percent = SERVO_FLUSH;
+
+  if (board_mode == FLYING) {
+    duty_percent = flight_state.get_servo();
+  } else if (board_mode == UNARMED) {
+    // Just a generic parabola (maxed with 0) to generate the full range of motion over a few seconds
+    // It is 0 at 1500 and 4500 millis and peaks at 1 since it is 0 at 1500 millis that gives
+    // the servo 1500 to zero since we don't know its position
+    double time = millis_in_mode() / SECONDS_TO_MILLIS;
+    double duty_percent = max(-(time - 1.5) * (time - 4.5) / 2.25, 0.0);
+  }
+
+  servo.setPWM(SERVO_1, (float)SERVO_FREQ, (float)(duty_percent * SERVO_FREQ));
 }
 
 // TODO: Check self heating mentioned for similar product in MS5xxx library docs
@@ -313,9 +328,6 @@ void loop() {
     return;
   }
 
-  // log_message(String(flight_state.vel.x()) + " " + String(flight_state.vel.y()) + "" + String(flight_state.vel.z()));
-  // log_message(String(flight_state.pos.x()) + " " + String(flight_state.pos.y()) + "" + String(flight_state.pos.z()));
-
   // Sample the sensors (this updates the relevant state object)
   sample_baro();
   sample_imu();
@@ -330,3 +342,4 @@ void loop() {
     log_message("Loop overrun");
   }
 }
+

@@ -71,8 +71,13 @@ static RGB MODE_TO_COLOR[] = {
 #define UNKNOWN_WAIT        2000
 #define DEBUG_BOOT_DELAY    3000
 
-#define SECONDS_TO_MILLIS 1000
+#define SECONDS_TO_MILLIS 1000.0
 #define GYRO_TO_RADPS     (0.001 * DEG_TO_RAD)
+
+#define SERVO_FREQ 300.0
+#define SERVO_MIN 0.0
+#define SERVO_MAX 1.0
+#define SERVO_FLUSH 0.3
 
 bool delay_to(Millis target_time);
 

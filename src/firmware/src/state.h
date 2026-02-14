@@ -25,6 +25,8 @@ struct FlightState {
   void push_baro(double pressure, double temperature, double sample_rate);
   void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, double sample_rate);
 
+  double get_servo();
+
   bool done();
 };
 

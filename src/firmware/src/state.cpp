@@ -26,6 +26,10 @@ void FlightState::push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, doub
   rot.normalize();
 }
 
+double FlightState::get_servo() {
+  return 0.0;
+}
+
 bool FlightState::done() {
   // I believe IREC requires no flight controls at 30 degrees
   // We know that (0.0, 0.0, -1.0) is up from the local frame
