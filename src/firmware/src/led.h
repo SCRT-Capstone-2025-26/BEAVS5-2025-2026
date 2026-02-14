@@ -19,12 +19,6 @@ enum LEDs {
     LED_STATUS = 5
 };
 
-// The LEDS are visible with just a value of 1 out of 255, but not completly blinding
-#define LED_POSITIVE RGB(0, 1, 0)
-#define LED_NEGATIVE RGB(1, 0, 0)
-#define LED_DISABLE  RGB(0, 0, 0)
-#define LED_NEUTRAL  RGB(0, 0, 1)
-
 #define LED_COUNT 6
 
 extern RGB leds[LED_COUNT];

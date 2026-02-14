@@ -22,8 +22,8 @@ struct FlightState {
 
   FlightState() {}
 
-  void push_baro(double pressure, double temperature, Millis sample_rate);
-  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate);
+  void push_baro(double pressure, double temperature, double sample_rate);
+  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, double sample_rate);
 
   bool done();
 };
@@ -39,11 +39,15 @@ struct RestState {
 
   RestState() {}
 
-  void push_baro(double pressure, double temperature, Millis sample_rate);
-  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, Millis sample_rate);
+  void push_baro(double pressure, double temperature, double sample_rate);
+  void push_imu(ISM6HG256X_Axes_t &acc, ISM6HG256X_Axes_t &gyro, double sample_rate);
 
   // Returns true if the rocket is flying and inits the flight state to that
   bool try_init_flying(FlightState &state);
+
+  // Returns true if the rocket is flying and inits the flight state to that (called for some time when booting)
+  // Is Currently the same as try_init_flying
+  bool try_init_flying_boot(FlightState &state);
 };
 
 #endif

@@ -1,6 +1,7 @@
 // largely stolen from https://github.com/xyphro/XiaoNeoPixel_RP2040
 
 #include "led.h"
+#include "util.h"
 #include "pins.h"
 
 // TODO: Investigate the seemlingly needed sleeps

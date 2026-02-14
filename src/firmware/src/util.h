@@ -2,13 +2,33 @@
 #define UTIL_H
 
 #include <Arduino.h>
+#include <cmath>
+
+#include "led.h"
 
 #define gravity_acc 981
 
 typedef unsigned long Millis;
 
+// Booting = The board is initializing components in the setup function (which could be run on a power failure or watchdog reboot)
+// Unknown = Right after booting to determine if the board is flying right now or not
+// Unarmed = The board demos the servo and then idles
+// Armed   = The board is waiting for launch
+// Flying  = The board is in activate control and trying to aerobrake to the target altitude
+// Done    = The board is done active controls
+// Failure = The board has reached an unrecoverable state
+
+// Booting -> Unknown = After the boot sequence is done
+// Unknown -> Unarmed = After enough time has elasped to determine if flight is happening and it hasn't been detected
+// Unknown -> Flying  = After enough time has elasped to determine if flight is happening and it has been detected
+// Unarmed -> Armed   = The arming pin has been detected
+// Armed   -> Flight  = Flight has been detected
+// FLight  -> Done    = The board is done with active controls (either because apogee was reached or competition rules require shutoff)
+// *       -> Failure = An error that cannot be recovered from was detected
+
 enum BoardMode {
   BOOTING,
+  UNKNOWN,
   UNARMED,
   ARMED,
   FLYING,
@@ -16,14 +36,45 @@ enum BoardMode {
   FAILURE
 };
 
-static String modeToName[] = {
+static String MODE_TO_NAME[] = {
   "Booting",
+  "Unknown",
   "Unarmed",
   "Armed",
   "Flying",
   "Done",
   "Failure",
 };
+
+// The LEDS are visible with just a value of 1 out of 255, but not completly blinding
+
+// The color scheme is roughly
+// Red: Close to flight/in flight
+// Green: In stable idle state
+// Blue: Close to boot/in boot
+static RGB MODE_TO_COLOR[] = {
+  RGB(0, 0, 1),
+  RGB(1, 0, 1),
+  RGB(0, 1, 1),
+  RGB(1, 1, 0),
+  RGB(1, 0, 0),
+  RGB(0, 1, 0),
+  RGB(1, 1, 1),
+};
+
+#define LED_POSITIVE RGB(0, 1, 0)
+#define LED_NEGATIVE RGB(1, 0, 0)
+#define LED_DISABLE  RGB(0, 0, 0)
+#define LED_NEUTRAL  RGB(0, 0, 1)
+
+#define SERVO_CHARGE_MILLIS 2000
+#define UNKNOWN_WAIT        2000
+#define DEBUG_BOOT_DELAY    3000
+
+#define SECONDS_TO_MILLIS 1000
+#define GYRO_TO_RADPS     (0.001 * DEG_TO_RAD)
+
+bool delay_to(Millis target_time);
 
 #endif
 

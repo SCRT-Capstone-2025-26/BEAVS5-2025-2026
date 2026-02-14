@@ -10,14 +10,19 @@
 #include "led.h"
 #include "util.h"
 
-// TODO: Look into clock overflow
+// NOTE: This code uses millis() extensively and assumes it will not overflow (it will overflow in >40 days and that is not intended usage)
 // TODO: Look into gyro saturation
 // TODO: Look into pressure drop when hitting around mach numbers
-// TODO: Create a function to switch mode that logs the switches
+// TODO: Implement watchdog and look into how to store memory between watchdog reboots (probably write important data to flash on watchdog)
+//  this requires important data to be written such that the watchdog is able to read them in a consistent state at anytime
 
 BoardMode board_mode = BOOTING;
+Millis last_mode_change = 0;
+
 FlightState flight_state = FlightState();
 RestState rest_state = RestState();
+
+bool servo_powered = false;
 
 // The pins aren't correctly assigned for hardware SPI on the board
 // I assume it is a mistake (?) so we have to use bit banging
@@ -29,9 +34,9 @@ ISM6HG256XSensor imu(&softSPI, IMU_CS);
 // The servo has an operating frequency of 50-300Hz
 RP2040_PWM servo(SERVO_1, 300, 0);
 
-// TODO: Handle wrap around
 Millis next_sample;
-Millis sample_rate = 100;
+const Millis sample_rate_ms = 100;
+const double sample_rate_s = (double)sample_rate_ms / SECONDS_TO_MILLIS;
 
 void init_pins() {
   // Disable servo power on startup due to inrush
@@ -70,30 +75,54 @@ void init_pins() {
 }
 
 // The servo cannot be enabled before the capacitors charge
-void init_servo() {
-  // We could do 2000 - millis(), but it is safer not to
-  // Once we add booting in flight this may change
-  delay(2000);
+bool try_power_servo() {
+  if (millis() < SERVO_CHARGE_MILLIS) {
+    return false;
+  }
 
   digitalWrite(SERVO_POWER_ENABLE, HIGH);
+  servo_powered = true;
+  return true;
 }
 
 void push_mode(BoardMode mode) {
   log_message(ModeChange(board_mode, mode));
+
+  leds[LED_STATUS] = MODE_TO_COLOR[mode];
+  led_show();
+
   board_mode = mode;
+  last_mode_change = millis();
 }
 
-void push_failure(LEDs failure_led) {
+Millis millis_in_mode() {
+  // This should never happen
+  if (last_mode_change > millis()) {
+    log_message("Mode changed marked in future");
+    return 0;
+  }
+
+  return millis() - last_mode_change;
+}
+
+// Pushing LED_STATUS gets overwritten immediatly so is equivalent to a failure with no origin
+void push_failure(LEDs failure_led = LED_STATUS) {
   leds[failure_led] = LED_NEGATIVE;
-  leds[LED_STATUS] = LED_NEGATIVE;
+  // Push mode updates the LEDS so we don't need to call led_show
   led_show();
 
   push_mode(FAILURE);
 }
 
 // NOTE: Init values are temporary and will be determined by data later
-// TODO: Check the boards current state instead of assuming it is one the ground and booting (in case of power loss or watchdog)
 void setup() {
+#ifdef DEBUG
+  // Allow some time for the serial monitor to connect
+  delay(DEBUG_BOOT_DELAY);
+#endif
+
+  // TODO: Check if this is a watchdog boot
+
   // Initialize the pins
   // This initializes the servo power pins which if improperly initialized can cause
   //  problems with the capacitors when charging
@@ -103,6 +132,9 @@ void setup() {
   // This inits the LEDs it sets them all to powered off
   led_init();
   log_message("LEDs inited");
+
+  // Push mode uses the leds
+  push_mode(BOOTING);
 
   // The radio is not currently used (or installed) so we just set the led to mark that (neutral is blue which is visible)
   leds[LED_RADIO] = LED_NEUTRAL;
@@ -144,6 +176,22 @@ void setup() {
   leds[LED_IMU] = imu_init ? LED_POSITIVE : LED_NEGATIVE;
   led_show();
 
+  if (baro_init && imu_init) {
+    // The board is now ready to be armed
+    push_mode(UNKNOWN);
+  } else {
+    // The board has failed to init
+    push_mode(FAILURE);
+  }
+
+  next_sample = millis();
+}
+
+// This is called when the board confirms that it has booted an is on the ground waiting to launch
+// It could take some time to run (because it waits for the log core), but it shouldn't because the
+//  log core should boot fast
+void ground_boot() {
+  log_message("Waiting on log core");
   // Wait for the other core to finish booting
   // This returns when the other core has booted with whether it has created log files
   bool sd_failure = wait_log_boot();
@@ -153,56 +201,70 @@ void setup() {
   if (!sd_failure) { log_message("SD inited"); }
   leds[LED_SD] = sd_failure ? LED_NEGATIVE : LED_POSITIVE;
   led_show();
-
-  // init_servo();
-  // TODO: Prove/test servo works here
-
-  // An sd_failure isn't critical so it is not included in this if
-  if (baro_init && imu_init) {
-    // The board is now ready to be armed
-    push_mode(UNARMED);
-    leds[LED_STATUS] = LED_POSITIVE;
-  } else {
-    // The board has failed to init
-    push_mode(FAILURE);
-    leds[LED_STATUS] = LED_POSITIVE;
-  }
-
-  led_show();
-
-  next_sample = millis();
 }
 
 // This is called every loop iteration and is responsible for managing the state transitions
+// Returns true if the mode changed
 void update_mode() {
   switch (board_mode) {
-    // TODO: Unarmed to armed transition
-    case UNARMED:
-      // NOTE: This is for testing
-      if (millis() > 8000) { push_mode(ARMED); }
+    case UNKNOWN:
+      // If booted during flight we should know our before 
+      if (rest_state.try_init_flying_boot(flight_state)) {
+        push_mode(FLYING);
+      } else if (millis_in_mode() >= UNKNOWN_WAIT) {
+        ground_boot();
+        push_mode(UNARMED);
+      }
+
       break;
+
+    case UNARMED:
+      // TODO: Unarmed to armed transition
+      // NOTE: This is for testing
+      if (millis_in_mode() > 3000) {
+        push_mode(ARMED);
+      }
+
+      break;
+
     case ARMED:
       // If the rest_state can init the flying state then it means that it has detected high acceleration
       //  and we are in flight
       if (rest_state.try_init_flying(flight_state)) {
         push_mode(FLYING);
       }
+
       break;
+
     case FLYING:
       // If the flight_state decides that we are done (practically our angle is too high or we have timed out)
       if (flight_state.done()) {
         push_mode(DONE);
       }
+
       break;
+
+    case DONE:
+      break;
+
     default:
-      push_failure(LED_STATUS);
+      push_failure();
+
       break;
   }
 }
 
 void update_servo() {
+  if (!servo_powered) {
+    if (try_power_servo()) {
+      log_message("Servo powered");
+    }
+  }
+
   if (board_mode == FLYING) {
     // TODO: Set servo to something from flight_state
+  } else if (board_mode == UNARMED) {
+    // TODO: Demo servo working once with millis_in_mode
   } else {
     // TODO: Set servo to flush
   }
@@ -210,20 +272,20 @@ void update_servo() {
 
 // TODO: Check self heating mentioned for similar product in MS5xxx library docs
 // TODO: Add error handling
-void sample_baro(Millis sample_rate) {
+void sample_baro() {
   baro.read();
   double temp = baro.getPressure();
   double pressure = baro.getTemperature();
 
   if (board_mode == FLYING) {
-    flight_state.push_baro(temp, pressure, sample_rate);
-  } else if (board_mode == UNARMED || board_mode == ARMED) {
-    rest_state.push_baro(temp, pressure, sample_rate);
+    flight_state.push_baro(temp, pressure, sample_rate_s);
+  } else if (board_mode == UNKNOWN || board_mode == UNARMED || board_mode == ARMED) {
+    rest_state.push_baro(temp, pressure, sample_rate_s);
   }
 }
 
 // TODO: Add error handling
-void sample_imu(Millis sample_rate) {
+void sample_imu() {
   ISM6HG256X_Axes_t acc_axis;
   ISM6HG256X_Axes_t gyro_axis;
 
@@ -231,14 +293,13 @@ void sample_imu(Millis sample_rate) {
   imu.Get_G_Axes(&gyro_axis);
 
   if (board_mode == FLYING) {
-    flight_state.push_imu(acc_axis, gyro_axis, sample_rate);
-  } else if (board_mode == UNARMED || board_mode == ARMED) {
-    rest_state.push_imu(acc_axis, gyro_axis, sample_rate);
+    flight_state.push_imu(acc_axis, gyro_axis, sample_rate_s);
+  } else if (board_mode == UNKNOWN || board_mode == UNARMED || board_mode == ARMED) {
+    rest_state.push_imu(acc_axis, gyro_axis, sample_rate_s);
   }
 }
 
 // This handles what the board should do when it has reached a critical failure
-// TODO: One sensor fail may not be critical
 void do_failure() {
   delay(1000);
 }
@@ -250,20 +311,20 @@ void loop() {
     return;
   }
 
-  log_message(String(flight_state.vel.x()) + " " + String(flight_state.vel.y()) + "" + String(flight_state.vel.z()));
-  log_message(String(flight_state.pos.x()) + " " + String(flight_state.pos.y()) + "" + String(flight_state.pos.z()));
+  // log_message(String(flight_state.vel.x()) + " " + String(flight_state.vel.y()) + "" + String(flight_state.vel.z()));
+  // log_message(String(flight_state.pos.x()) + " " + String(flight_state.pos.y()) + "" + String(flight_state.pos.z()));
 
   // Sample the sensors (this updates the relevant state object)
-  sample_baro(sample_rate);
-  sample_imu(sample_rate);
-
-  update_mode();
+  sample_baro();
+  sample_imu();
 
   // Update the servo based on the state object
   update_servo();
 
-  next_sample += sample_rate;
-  Millis curr = millis();
-  // Since millis is unsigned we have to check for overflow
-  if (curr <= next_sample) { delay(next_sample - curr); }
+  update_mode();
+
+  next_sample += sample_rate_ms;
+  if (!delay_to(next_sample)) {
+    log_message("Loop overrun");
+  }
 }

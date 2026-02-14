@@ -70,7 +70,7 @@ bool wait_log_boot() {
 void setup1() {
 #ifdef DEBUG
   // Allow some time for the serial to connect
-  log_message("DEBUG MODE ENABLED");
+  delay(DEBUG_BOOT_DELAY);
 #endif
 
   // Init the serial
@@ -117,11 +117,6 @@ void setup1() {
     log_message("SD init failed");
   }
 
-#ifdef DEBUG
-  // Allow some time for the serial monitor to connect
-  delay(3000);
-#endif
-
   // If the file isn't inited then there is an SD failure
   sd_failure = !file_inited;
   log_booted = true;
@@ -144,7 +139,7 @@ void handle_event(LogEvent &event) {
   // Convert the log data into a human readable string
   String content = match(event.value,
     [](String str) { return String(str); },
-    [](ModeChange change) { return String(modeToName[change.old] + " -> " + modeToName[change.next]); }
+    [](ModeChange change) { return String(MODE_TO_NAME[change.old] + " -> " + MODE_TO_NAME[change.next]); }
   );
 
   // For some reason the Arduino examples use this string adding
