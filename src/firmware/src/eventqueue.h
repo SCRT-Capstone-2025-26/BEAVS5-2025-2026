@@ -36,7 +36,6 @@ SOFTWARE.
 ///
 template <class T, uint8_t s=8>
 class EventQueue{
-
 public:
     EventQueue(): _in(0), _out(0), _count(0), _s(s) {
         sem_init(&_rw_sem, 1, 1);
@@ -66,7 +65,7 @@ public:
     }
 
     // Insert item to queue.
-    bool putQ(const T &e){
+    bool putQ(const T &&e){
         bool rc = false;
 
         sem_acquire_blocking(&_rw_sem);

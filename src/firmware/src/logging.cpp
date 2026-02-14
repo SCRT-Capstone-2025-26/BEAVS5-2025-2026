@@ -1,6 +1,7 @@
 #include <atomic>
 #include <SdFat.h>
 #include <pico/platform.h>
+#include <variant>
 // TODO: Possibly add radio
 
 #include "logging.h"
@@ -32,27 +33,33 @@ FsFile data_file;
 // This is a class to put logs in the queue from the main core
 struct LogEvent {
   Millis timestamp;
-  int core;
-  // TODO: Variant
+  uint core;
   Message value;
+};
 
-  LogEvent(Millis timestamp, int core, Message value) : timestamp(timestamp), core(core), value(value) {
-  }
-
-  LogEvent() {
-  }
+struct DataEvent {
+  Millis timestamp;
+  Reading reading;
 };
 
 // This is thread safe to store the events put in the queue
 // Should be big enough for boot events to build up before being cleared
-EventQueue<LogEvent, 64> events;
+EventQueue<std::variant<LogEvent, DataEvent>, 64> events;
 // Is set to time if there is a log and events is full
 // If there are two fails only one is guarranteed to work
 std::atomic_bool event_write_fail;
 
 // This can be called from either core and is the main logging functionality
 void log_message(Message &&content) {
-  if (!events.putQ(LogEvent(millis(), get_core_num(), content))) {
+  if (!events.putQ(LogEvent{millis(), get_core_num(), content})) {
+    // If we fail to write then we mark that
+    event_write_fail = true;
+  }
+}
+
+// This should be call by the main core
+void write_readings(Reading &&reading) {
+  if (!events.putQ(DataEvent{millis(), reading})) {
     // If we fail to write then we mark that
     event_write_fail = true;
   }
@@ -106,7 +113,7 @@ void setup1() {
       data_file = sd.open(data_path, (oflag_t)(O_CREAT | O_WRITE | O_APPEND));
 
       // Init the csv header
-      data_file.println("time,altitude");
+      data_file.println("time,acc x,acc y, acc z,gyro x, gyro y,gyro z");
       data_file.flush();
 
       // We have created log files
@@ -135,7 +142,7 @@ void write_log(String content) {
 
 // Handles a log event converting it into something usable
 // This could probably be optimized quite a bit because of the string concat and copying
-void handle_event(LogEvent &event) {
+void handle_log_event(LogEvent event) {
   // Convert the log data into a human readable string
   String content = match(event.value,
     [](String str) { return String(str); },
@@ -147,20 +154,39 @@ void handle_event(LogEvent &event) {
   write_log("[time: " + String(event.timestamp) + "ms, core: " + String(event.core) + "] " + content);
 }
 
+void handle_data_event(DataEvent event) {
+  if (!sd_failure) {
+    String content =
+      String(event.timestamp) + "," +
+      String(event.reading.acc_axis.x) + "," +
+      String(event.reading.acc_axis.y) + "," +
+      String(event.reading.acc_axis.z) + "," +
+      String(event.reading.gyro_axis.x) + "," +
+      String(event.reading.gyro_axis.y) + "," +
+      String(event.reading.gyro_axis.z);
+
+    data_file.println(content);
+    data_file.flush();
+  }
+}
+
 // Just empties the log queue
 void loop1() {
-  LogEvent event;
+  std::variant<LogEvent, DataEvent> event;
 
   while (true) {
     events.getQ(event, true);
-    handle_event(event);
 
+    // Check if there was an overflow in the event queue
     if (event_write_fail) {
       // Set this false first to catch more overflows
       event_write_fail = false;
 
       write_log("Log buffer full.");
     }
+
+    // I don't know why the lambdas are needed
+    match(event, [](LogEvent event) { handle_log_event(event); }, [](DataEvent event) { handle_data_event(event); });
   }
 }
 

@@ -86,7 +86,7 @@ bool try_power_servo() {
 }
 
 void push_mode(BoardMode mode) {
-  log_message(ModeChange(board_mode, mode));
+  log_message(ModeChange{board_mode, mode});
 
   leds[LED_STATUS] = MODE_TO_COLOR[mode];
   led_show();
@@ -291,6 +291,8 @@ void sample_imu() {
 
   imu.Get_X_Axes(&acc_axis);
   imu.Get_G_Axes(&gyro_axis);
+
+  write_readings(Reading{acc_axis, gyro_axis});
 
   if (board_mode == FLYING) {
     flight_state.push_imu(acc_axis, gyro_axis, sample_rate_s);
