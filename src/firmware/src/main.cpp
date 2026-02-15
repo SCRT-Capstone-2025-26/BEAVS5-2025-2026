@@ -63,11 +63,12 @@ void init_pins() {
   pinMode(MISO, INPUT);
   pinMode(SCK, OUTPUT);
 
+  pinMode(ARM_SWITCH, INPUT);
+  pinMode(BATTERY_SENSE, INPUT);
+
   pinMode(BAROMETER_CS, OUTPUT);
   pinMode(IMU_CS, OUTPUT);
   pinMode(RADIO_CS, OUTPUT);
-
-  pinMode(BATTERY_SENSE, INPUT);
 
   digitalWrite(BAROMETER_CS, HIGH);
   digitalWrite(IMU_CS, HIGH);
@@ -219,9 +220,7 @@ void update_mode() {
       break;
 
     case UNARMED:
-      // TODO: Unarmed to armed transition
-      // NOTE: This is for testing
-      if (millis_in_mode() > 3000) {
+      if (digitalRead(ARM_SWITCH) == HIGH) {
         push_mode(ARMED);
       }
 
@@ -232,6 +231,10 @@ void update_mode() {
       //  and we are in flight
       if (rest_state.try_init_flying(flight_state)) {
         push_mode(FLYING);
+      }
+
+      if (digitalRead(ARM_SWITCH) == LOW) {
+        push_mode(UNARMED);
       }
 
       break;
